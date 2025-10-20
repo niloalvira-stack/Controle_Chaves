@@ -16,7 +16,7 @@ class SessionManager:
                 (user_login,), fetchone=True
             )
             if user_data:
-                self.current_user = user_data
+                self.current_user = dict(user_data)  # <-- CORREÇÃO RECOMENDADA
                 self.user_login = user_login
                 self.is_admin = bool(is_admin)
                 self.login_time = time.time()

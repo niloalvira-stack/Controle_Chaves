@@ -70,10 +70,10 @@ class LoginWindow(QWidget):
         print(f"Usuário recuperado do banco: {user}")
 
         if user:
+            user = dict(user)  # <-- CORREÇÃO FUNDAMENTAL: converte para dict, compatível com .get() e [ ]
             senha_banco = user['senha']
             print(f"Hash armazenado: {senha_banco}")
 
-            # FORÇA troca de senha se a senha do banco NÃO for hash bcrypt
             hash_valido = senha_banco and senha_banco.startswith("$2b$")
             if not hash_valido:
                 show_warning("Atenção", "Sua senha está salva de forma insegura. Você precisa trocá-la para continuar.")

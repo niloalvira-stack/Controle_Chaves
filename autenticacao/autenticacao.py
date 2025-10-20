@@ -31,7 +31,8 @@ def verify_password(stored_hash: str, password: str) -> bool:
 
 def get_user_by_login(login: str):
     query = "SELECT id, login, nome, senha, primeiro_login, is_admin FROM usuarios WHERE login = ?"
-    return execute_query(query, (login,), fetchone=True)
+    result = execute_query(query, (login,), fetchone=True)
+    return dict(result) if result else None
 
 def show_info(title: str, message: str):
     """Exibe caixa de mensagem Informativa na GUI."""

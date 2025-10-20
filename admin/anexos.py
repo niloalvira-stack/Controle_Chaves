@@ -50,7 +50,7 @@ class AnexosTab(QWidget):
             self.table.insertRow(row_idx)
             self.table.setItem(row_idx, 0, QTableWidgetItem(str(anexo["id"])))
             self.table.setItem(row_idx, 1, QTableWidgetItem(anexo["nome"]))
-            self.table.setItem(row_idx, 2, QTableWidgetItem(anexo.get("predio_nome") or "Nenhum"))
+            self.table.setItem(row_idx, 2, QTableWidgetItem(anexo["predio_nome"] or "Nenhum"))
 
     def add_anexo(self):
         nome = self.input_nome.text().strip()

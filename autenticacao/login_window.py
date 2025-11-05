@@ -60,14 +60,14 @@ class LoginWindow(QWidget):
         login = self.input_login.text().strip()
         senha = self.input_senha.text().strip()
 
-        print(f"Tentativa de login com login: {login} e senha: {senha}")
+        #print(f"Tentativa de login com login: {login} e senha: {senha}")
 
         if not login or not senha:
             QMessageBox.warning(self, "Erro", "Preencha login e senha.")
             return
 
         user = get_user_by_login(login)
-        print(f"Usuário recuperado do banco: {user}")
+        #print(f"Usuário recuperado do banco: {user}")
 
         if user:
             user = dict(user)  # <-- CORREÇÃO FUNDAMENTAL: converte para dict, compatível com .get() e [ ]

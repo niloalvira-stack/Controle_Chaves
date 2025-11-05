@@ -4,9 +4,12 @@ from admin.predios import PrediosTab
 from admin.anexos import AnexosTab
 from admin.salas import SalasTab
 
+print("INICIO: admin.py")
+
 class AdminTab(QWidget):
     def __init__(self):
         super().__init__()
+
 
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)

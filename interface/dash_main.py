@@ -1,39 +1,22 @@
 import sys
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QMessageBox,
-    QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
-)
 
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QMessageBox
 from admin.admin import AdminTab
 from autenticacao.login_window import LoginWindow
-from autenticacao.session import session_manager, is_admin
+from controle.movimentacoes import MovimentacoesTab
+from autenticacao.session import is_admin
 
-
-
-
-class SomeCommonWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Conteúdo das movimentações"))
-        self.setLayout(layout)
-
-class AdminWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Painel administrativo"))
-        self.setLayout(layout)
+print("INICIO: dash_main.py")
 
 class DashMain(QMainWindow):
     def __init__(self):
+        print("Entrando no construtor DashMain")
         super().__init__()
         self.setWindowTitle("Dashboard Controle de Chaves")
         self.resize(800, 600)
 
         main_layout = QVBoxLayout()
 
-        # Área para botão sair
         button_layout = QHBoxLayout()
         self.btn_sair = QPushButton("Sair")
         self.btn_sair.clicked.connect(self.sair)
@@ -44,7 +27,6 @@ class DashMain(QMainWindow):
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs)
 
-        # Container principal que segura o layout
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
@@ -52,39 +34,14 @@ class DashMain(QMainWindow):
         self.load_tabs()
 
     def load_tabs(self):
-        self.tabs.addTab(SomeCommonWidget(), "Movimentações")
-
+        print("DashMain: adicionando MovimentacoesTab")
+        self.tabs.addTab(MovimentacoesTab(), "Movimentações")
         if is_admin():
+            print("DashMain: usuário é admin, adicionando AdminTab")
             self.tabs.addTab(AdminTab(), "Administração")
-
         else:
-            QMessageBox.information(
-                self, "Restrição",
-                "A aba Administração é acessível apenas para administradores."
-            )
+            QMessageBox.information(self, "Restrição", "A aba Administração é acessível apenas para administradores.")
 
     def sair(self):
+        print("DashMain: sair chamado, janela fechada")
         self.close()
-
-class MainApp:
-    def __init__(self):
-        print("Inicializando QApplication...")
-        self.app = QApplication(sys.argv)
-        print("Criando janela de login...")
-        self.login_window = LoginWindow(self.on_login_success)
-        self.dash_main = None
-
-    def on_login_success(self, user):
-        print(f"Login bem-sucedido para {user['login']}")
-        session_manager.login(user["login"], user["is_admin"])
-        self.dash_main = DashMain()
-        self.dash_main.show()
-        self.login_window.close()
-
-    def run(self):
-        self.login_window.show()
-        sys.exit(self.app.exec_())
-
-if __name__ == "__main__":
-    main_app = MainApp()
-    main_app.run()

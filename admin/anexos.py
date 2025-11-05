@@ -59,14 +59,10 @@ class AnexosTab(QWidget):
             QMessageBox.warning(self, "Aviso", "Digite o nome do anexo!")
             return
         try:
-            result = execute_query("INSERT INTO anexos (nome, predio_id) VALUES (?, ?)", (nome, predio_id))
-            success = result is not None
-            if success:
-                QMessageBox.information(self, "Sucesso", f"Anexo '{nome}' adicionado!")
-                self.load_anexos()
-                self.input_nome.clear()
-            else:
-                QMessageBox.critical(self, "Erro", "Falha ao adicionar anexo.")
+            execute_query("INSERT INTO anexos (nome, predio_id) VALUES (?, ?)", (nome, predio_id))
+            QMessageBox.information(self, "Sucesso", f"Anexo '{nome}' adicionado!")
+            self.load_anexos()
+            self.input_nome.clear()
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Falha ao adicionar anexo: {str(e)}")
 
@@ -82,19 +78,16 @@ class AnexosTab(QWidget):
             QMessageBox.warning(self, "Aviso", "Digite o novo nome do anexo!")
             return
         try:
-            result = execute_query(
+            execute_query(
                 "UPDATE anexos SET nome=?, predio_id=? WHERE id=?",
                 (novo_nome, predio_id, anexo_id)
             )
-            success = result is not None
-            if success:
-                QMessageBox.information(self, "Sucesso", "Anexo alterado com sucesso!")
-                self.load_anexos()
-                self.input_nome.clear()
-            else:
-                QMessageBox.critical(self, "Erro", "Falha ao alterar anexo.")
+            QMessageBox.information(self, "Sucesso", "Anexo alterado com sucesso!")
+            self.load_anexos()
+            self.input_nome.clear()
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Falha ao alterar anexo: {str(e)}")
+
 
     def delete_anexo(self):
         selected = self.table.currentRow()
@@ -103,12 +96,9 @@ class AnexosTab(QWidget):
             return
         anexo_id = int(self.table.item(selected, 0).text())
         try:
-            result = execute_query("DELETE FROM anexos WHERE id=?", (anexo_id,))
-            success = result is not None
-            if success:
-                QMessageBox.information(self, "Sucesso", "Anexo excluído com sucesso!")
-                self.load_anexos()
-            else:
-                QMessageBox.critical(self, "Erro", "Falha ao excluir anexo.")
+            execute_query("DELETE FROM anexos WHERE id=?", (anexo_id,))
+            QMessageBox.information(self, "Sucesso", "Anexo excluído com sucesso!")
+            self.load_anexos()
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Falha ao excluir anexo: {str(e)}")
+

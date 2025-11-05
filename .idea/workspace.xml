@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/controle_chaves.sqbpro" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Controle_Chaves.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Controle_Chaves.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/project.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Criar_admin.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/anexos.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/anexos.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/salas.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/salas.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/autenticacao.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/create_admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/create_admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/login_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/login_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controle/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controle/movimentacoes.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/movimentacoes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database_init.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_init.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorios.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_Password.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_admin_user.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Criar_admin.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Update_db.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/estrutura_projeto.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/listar_usuarios.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/migrar_tabelas.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/recriar_movimentacoes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/script_databaser_module.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_admin_user.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_janela.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_login.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_modules.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/tyest_auth.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/update+password.py" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/database_init.py" root0="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="336mFC7M7asympHQKmv6W8ZVMPn" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.Criar_admin.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Has_clear.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Update_db.executor&quot;: &quot;Run&quot;,
+    &quot;Python._init_.executor&quot;: &quot;Run&quot;,
+    &quot;Python.autenticacao.executor&quot;: &quot;Run&quot;,
+    &quot;Python.create_admin.executor&quot;: &quot;Run&quot;,
+    &quot;Python.database_init.executor&quot;: &quot;Run&quot;,
+    &quot;Python.database_module.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.listar_usuarios.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.migrar_tabelas.executor&quot;: &quot;Run&quot;,
+    &quot;Python.recriar_movimentacoes.executor&quot;: &quot;Run&quot;,
+    &quot;Python.salas.executor&quot;: &quot;Run&quot;,
+    &quot;Python.script_databaser_module.executor&quot;: &quot;Run&quot;,
+    &quot;Python.scrt_banco.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_Password.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_admin_user.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_janela.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_movimentcoes.executor&quot;: &quot;Run&quot;,
+    &quot;Python.teste.executor&quot;: &quot;Run&quot;,
+    &quot;Python.teste_qt.executor&quot;: &quot;Run&quot;,
+    &quot;Python.tyest_auth.executor&quot;: &quot;Run&quot;,
+    &quot;Python.update+password.executor&quot;: &quot;Run&quot;,
+    &quot;Python.utils.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Controle_Chaves&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.grazie&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-7e47963ff851-f0eec537fc84-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.23892.515" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="" />
+      <created>1758645797565</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1758645797565</updated>
+      <workItem from="1758645798980" duration="31000" />
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/admin/__init__.py</url>
+          <line>5</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/interface/dash_main.py</url>
+          <line>10</line>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

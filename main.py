@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QApplication
 from autenticacao.login_window import LoginWindow
 from interface.dash_main import DashMain
 from autenticacao.session import session_manager  # Import ajustado para a pasta autenticacao
+from database_init import init_database
+init_database()
 
 
 class MainApp:

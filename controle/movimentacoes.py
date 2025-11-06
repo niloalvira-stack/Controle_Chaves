@@ -61,7 +61,6 @@ def registrar_devolucao(mov_id):
     conn.commit()
     conn.close()
 
-print("INICIO: movimentacoes.py")
 
 class MovimentacoesTab(QWidget):
     def __init__(self):

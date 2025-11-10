@@ -5,14 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controle/movimentacoes.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/movimentacoes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -16,9 +16,9 @@ class SessionManager:
                 (user_login,), fetchone=True
             )
             if user_data:
-                self.current_user = dict(user_data)  # <-- CORREÇÃO RECOMENDADA
+                self.current_user = dict(user_data)
                 self.user_login = user_login
-                self.is_admin = bool(is_admin)
+                self.is_admin = bool(user_data["is_admin"])  # Corrigido: pega flag correta do banco!
                 self.login_time = time.time()
                 self.last_activity = time.time()
                 return True
@@ -71,3 +71,5 @@ def is_admin():
 
 def is_logged_in():
     return session_manager.is_logged_in()
+
+

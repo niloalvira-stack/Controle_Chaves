@@ -17,9 +17,12 @@ class MainApp:
 
     def on_login_success(self, user):
         print(f"Login bem-sucedido para {user['login']}")
-        session_manager.login(user["login"], user["is_admin"])  # acesso direto via colchetes
+        session_manager.login(user["login"], user["is_admin"])
         self.dash_main = DashMain()
-        self.dash_main.show()
+        # abre a janela principal maximizada (ocupando a tela)
+        self.dash_main.showMaximized()
+        # se preferir full screen total (sem barra de tarefas), use:
+        # self.dash_main.showFullScreen()
         self.login_window.close()
 
     def run(self):

@@ -1,18 +1,56 @@
-from database_module import execute_query
+import sqlite3
 from PyQt5.QtWidgets import QMessageBox
 
-def safe_count(query, params=()):
-    """Executa query COUNT(*) com segurança, retornando 0 em caso de erro."""
-    try:
-        result = execute_query(query, params, fetchone=True)
-        if result:
-            return result[0]
-        return 0
-    except Exception:
-        return 0
+DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+
+def montar_display_sala_por_id(sala_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.nome, p.nome, a.nome
+        FROM salas s
+        LEFT JOIN predios p ON s.predio_id = p.id
+        LEFT JOIN anexos a ON s.anexo_id = a.id
+        WHERE s.id = ?
+    """, (sala_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return ""
+    nome, predio, anexo = row
+    display = nome
+    if predio:
+        display += f" - {predio}"
+    if anexo:
+        display += f" - {anexo}"
+    return display
+
+def montar_display_sala_variavel(nome, predio, anexo):
+    display = nome
+    if predio:
+        display += f" - {predio}"
+    if anexo:
+        display += f" - {anexo}"
+    return display
+
+def montar_display_sala_por_id(sala_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.nome, p.nome, a.nome
+        FROM salas s
+        LEFT JOIN predios p ON s.predio_id = p.id
+        LEFT JOIN anexos a ON s.anexo_id = a.id
+        WHERE s.id = ?
+    """, (sala_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return ""
+    nome, predio, anexo = row
+    return montar_display_sala_variavel(nome, predio, anexo)
 
 def show_info(title: str, message: str):
-    """Exibe caixa de mensagem informativa na GUI."""
     msg = QMessageBox()
     msg.setIcon(QMessageBox.Information)
     msg.setWindowTitle(title)
@@ -20,7 +58,6 @@ def show_info(title: str, message: str):
     msg.exec_()
 
 def show_warning(title: str, message: str):
-    """Exibe caixa de mensagem de aviso na GUI."""
     msg = QMessageBox()
     msg.setIcon(QMessageBox.Warning)
     msg.setWindowTitle(title)

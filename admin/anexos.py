@@ -1,104 +1,244 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QLineEdit, QComboBox, QMessageBox
+    QDialog, QFormLayout, QLineEdit, QComboBox, QMessageBox, QFileDialog, QHeaderView, QDialogButtonBox, QLabel
 )
-from database_module import execute_query
+import sqlite3
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+
+DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+
+class AnexoDialog(QDialog):
+    def __init__(self, predios, nome="", predio_id=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cadastro/Editar Anexo")
+        layout = QFormLayout(self)
+        self.nome_edit = QLineEdit(nome)
+        self.combo_predio = QComboBox()
+        self.combo_predio.addItem("Nenhum", None)
+        for pid, pname in predios:
+            self.combo_predio.addItem(pname, pid)
+        if predio_id:
+            idx = self.combo_predio.findData(predio_id)
+            if idx >= 0:
+                self.combo_predio.setCurrentIndex(idx)
+        layout.addRow("Nome do anexo:", self.nome_edit)
+        layout.addRow("Prédio:", self.combo_predio)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_data(self):
+        return {
+            "nome": self.nome_edit.text().strip(),
+            "predio_id": self.combo_predio.currentData()
+        }
 
 class AnexosTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
+        self.setWindowTitle("Gestão de Anexos")
+        layout = QVBoxLayout(self)
+        label = QLabel("Gestão de Anexos")
+        layout.addWidget(label)
+        btn_layout = QHBoxLayout()
+        self.btn_add = QPushButton("Cadastrar Anexo")
+        self.btn_edit = QPushButton("Editar Anexo")
+        self.btn_delete = QPushButton("Excluir Anexo")
+        self.btn_exportar = QPushButton("Exportar CSV")
+        self.btn_exportar_pdf = QPushButton("Exportar PDF")
+        btn_layout.addWidget(self.btn_add)
+        btn_layout.addWidget(self.btn_edit)
+        btn_layout.addWidget(self.btn_delete)
+        btn_layout.addWidget(self.btn_exportar)
+        btn_layout.addWidget(self.btn_exportar_pdf)
+        layout.addLayout(btn_layout)
+
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["ID", "Nome", "Prédio"])
-        self.layout.addWidget(self.table)
-        self.input_nome = QLineEdit()
-        self.input_nome.setPlaceholderText("Nome do anexo")
-        self.combo_predios = QComboBox()
-        self.combo_predios.addItem("Nenhum", None)
-        self.load_predios_combobox()
-        self.btn_add = QPushButton("Adicionar")
-        self.btn_edit = QPushButton("Alterar")
-        self.btn_delete = QPushButton("Excluir")
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(self.input_nome)
-        h_layout.addWidget(self.combo_predios)
-        h_layout.addWidget(self.btn_add)
-        h_layout.addWidget(self.btn_edit)
-        h_layout.addWidget(self.btn_delete)
-        self.layout.addLayout(h_layout)
-        self.btn_add.clicked.connect(self.add_anexo)
-        self.btn_edit.clicked.connect(self.edit_anexo)
-        self.btn_delete.clicked.connect(self.delete_anexo)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.setSelectionMode(self.table.SingleSelection)
+        self.table.setColumnHidden(0, True)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+        self.btn_add.clicked.connect(self.cadastrar_anexo)
+        self.btn_edit.clicked.connect(self.editar_anexo)
+        self.btn_delete.clicked.connect(self.excluir_anexo)
+        self.btn_exportar.clicked.connect(self.exportar_csv)
+        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
+        self.criar_tabela_anexos()
         self.load_anexos()
 
-    def load_predios_combobox(self):
-        self.combo_predios.clear()
-        self.combo_predios.addItem("Nenhum", None)
-        predios = execute_query("SELECT id, nome FROM predios ORDER BY nome ASC", (), fetchall=True)
-        for predio in predios:
-            self.combo_predios.addItem(predio["nome"], predio["id"])
+    def criar_tabela_anexos(self):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS anexos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                predio_id INTEGER,
+                FOREIGN KEY (predio_id) REFERENCES predios(id)
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    def fetch_predios(self):
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome FROM predios ORDER BY nome")
+            predios = cursor.fetchall()
+            conn.close()
+            return predios
+        except:
+            return []
 
     def load_anexos(self):
         self.table.setRowCount(0)
-        anexos = execute_query(
-            "SELECT a.id, a.nome, p.nome as predio_nome FROM anexos a LEFT JOIN predios p ON a.predio_id = p.id ORDER BY a.id DESC",
-            (), fetchall=True
-        )
-        for row_idx, anexo in enumerate(anexos):
-            self.table.insertRow(row_idx)
-            self.table.setItem(row_idx, 0, QTableWidgetItem(str(anexo["id"])))
-            self.table.setItem(row_idx, 1, QTableWidgetItem(anexo["nome"]))
-            self.table.setItem(row_idx, 2, QTableWidgetItem(anexo["predio_nome"] or "Nenhum"))
-
-    def add_anexo(self):
-        nome = self.input_nome.text().strip()
-        predio_id = self.combo_predios.currentData()
-        if not nome:
-            QMessageBox.warning(self, "Aviso", "Digite o nome do anexo!")
-            return
         try:
-            execute_query("INSERT INTO anexos (nome, predio_id) VALUES (?, ?)", (nome, predio_id))
-            QMessageBox.information(self, "Sucesso", f"Anexo '{nome}' adicionado!")
-            self.load_anexos()
-            self.input_nome.clear()
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.id, a.nome, p.nome
+                FROM anexos a LEFT JOIN predios p ON a.predio_id = p.id
+                ORDER BY a.nome
+            """)
+            for row_idx, (anexo_id, nome, predio_nome) in enumerate(cursor.fetchall()):
+                self.table.insertRow(row_idx)
+                self.table.setItem(row_idx, 0, QTableWidgetItem(str(anexo_id)))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(str(nome)))
+                self.table.setItem(row_idx, 2, QTableWidgetItem(str(predio_nome if predio_nome else "")))
+            conn.close()
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao adicionar anexo: {str(e)}")
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar anexos: {e}")
 
-    def edit_anexo(self):
-        selected = self.table.currentRow()
-        if selected < 0:
-            QMessageBox.warning(self, "Aviso", "Selecione um anexo para alterar!")
+    def cadastrar_anexo(self):
+        predios = self.fetch_predios()
+        dialog = AnexoDialog(predios)
+        if dialog.exec():
+            data = dialog.get_data()
+            if not data["nome"]:
+                QMessageBox.warning(self, "Erro", "Nome do anexo é obrigatório.")
+                return
+            try:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO anexos (nome, predio_id) VALUES (?, ?)",
+                    (data["nome"], data["predio_id"])
+                )
+                conn.commit()
+                conn.close()
+                QMessageBox.information(self, "Sucesso", "Anexo cadastrado com sucesso!")
+                self.load_anexos()
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao cadastrar anexo: {e}")
+
+    def editar_anexo(self):
+        selected = self.table.selectedItems()
+        if not selected:
+            QMessageBox.warning(self, "Aviso", "Selecione um anexo para editar!")
             return
-        anexo_id = int(self.table.item(selected, 0).text())
-        novo_nome = self.input_nome.text().strip()
-        predio_id = self.combo_predios.currentData()
-        if not novo_nome:
-            QMessageBox.warning(self, "Aviso", "Digite o novo nome do anexo!")
-            return
-        try:
-            execute_query(
-                "UPDATE anexos SET nome=?, predio_id=? WHERE id=?",
-                (novo_nome, predio_id, anexo_id)
-            )
-            QMessageBox.information(self, "Sucesso", "Anexo alterado com sucesso!")
-            self.load_anexos()
-            self.input_nome.clear()
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao alterar anexo: {str(e)}")
+        row = selected[0].row()
+        anexo_id = int(self.table.item(row, 0).text())
+        nome = self.table.item(row, 1).text()
+        predio_nome = self.table.item(row, 2).text()
+        predios = self.fetch_predios()
+        predio_id = next((pid for pid, pname in predios if pname == predio_nome), None)
+        dialog = AnexoDialog(predios, nome, predio_id)
+        if dialog.exec():
+            data = dialog.get_data()
+            if not data["nome"]:
+                QMessageBox.warning(self, "Erro", "Nome do anexo é obrigatório.")
+                return
+            try:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE anexos SET nome=?, predio_id=? WHERE id=?",
+                    (data["nome"], data["predio_id"], anexo_id)
+                )
+                conn.commit()
+                conn.close()
+                QMessageBox.information(self, "Sucesso", "Anexo atualizado com sucesso!")
+                self.load_anexos()
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao editar anexo: {e}")
 
-
-    def delete_anexo(self):
-        selected = self.table.currentRow()
-        if selected < 0:
+    def excluir_anexo(self):
+        selected = self.table.selectedItems()
+        if not selected:
             QMessageBox.warning(self, "Aviso", "Selecione um anexo para excluir!")
             return
-        anexo_id = int(self.table.item(selected, 0).text())
+        row = selected[0].row()
+        anexo_id = int(self.table.item(row, 0).text())
+        nome = self.table.item(row, 1).text()
+        reply = QMessageBox.question(
+            self,
+            "Confirmar Exclusão",
+            f"Deseja realmente excluir o anexo '{nome}'?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
         try:
-            execute_query("DELETE FROM anexos WHERE id=?", (anexo_id,))
-            QMessageBox.information(self, "Sucesso", "Anexo excluído com sucesso!")
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM anexos WHERE id=?", (anexo_id,))
+            conn.commit()
+            conn.close()
+            QMessageBox.information(self, "Sucesso", "Anexo excluído!")
             self.load_anexos()
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao excluir anexo: {str(e)}")
+            QMessageBox.critical(self, "Erro", f"Erro ao excluir anexo: {e}")
 
+    def exportar_csv(self):
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
+        if caminho:
+            try:
+                with open(caminho, "w", encoding="utf-8") as f:
+                    f.write("Nome;Prédio\n")
+                    for row in range(self.table.rowCount()):
+                        nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                        predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+                        f.write(f"{nome};{predio}\n")
+                QMessageBox.information(self, "Exportação", "Exportação concluída!")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+
+    def exportar_pdf(self):
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
+        if not caminho:
+            return
+        try:
+            cabecalho = ["Nome", "Prédio"]
+            dados = [cabecalho]
+            for row in range(self.table.rowCount()):
+                nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+                dados.append([nome, predio])
+            pdf = SimpleDocTemplate(
+                caminho, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+            )
+            table = Table(dados, repeatRows=1)
+            style = TableStyle([
+                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+                ("FONTSIZE", (0,0), (-1,-1), 9),
+                ("ALIGN", (0,0), (-1,-1), "CENTER"),
+                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                ("TOPPADDING", (0,0), (-1,-1), 2),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+            ])
+            table.setStyle(style)
+            pdf.build([table])
+            QMessageBox.information(self, "Exportação PDF", "PDF exportado com sucesso!")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

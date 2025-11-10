@@ -31,9 +31,9 @@ def init_database(db_path=DB_PATH):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS predios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            endereco TEXT
-        )''')
+            nome TEXT NOT NULL UNIQUE
+        )
+    ''')
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS salas (

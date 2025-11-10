@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import QMessageBox
 import sqlite3
 from database_init import DB_PATH   # Use o mesmo caminho centralizado do banco
 
-print("INICIO: autenticacao.py")
 
 
 def execute_query(query, params=(), fetchone=False):

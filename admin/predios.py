@@ -1,118 +1,215 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTableWidget, QTableWidgetItem, QHBoxLayout, QMessageBox
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
+    QDialog, QFormLayout, QLineEdit, QMessageBox, QFileDialog, QHeaderView, QLabel, QDialogButtonBox
 )
-from database_module import execute_query
+import sqlite3
+
+DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+
+class PredioDialog(QDialog):
+    def __init__(self, nome="", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cadastrar/Editar Prédio")
+        layout = QFormLayout(self)
+        self.nome_edit = QLineEdit(nome)
+        layout.addRow("Nome do prédio:", self.nome_edit)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_data(self):
+        return {
+            "nome": self.nome_edit.text().strip()
+        }
 
 class PrediosTab(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout()
+        self.setWindowTitle("Gestão de Prédios")
+        layout = QVBoxLayout(self)
         label = QLabel("Gestão de Prédios")
         layout.addWidget(label)
-        form_layout = QHBoxLayout()
-        self.input_nome = QLineEdit()
-        self.input_nome.setPlaceholderText("Nome do prédio")
-        form_layout.addWidget(self.input_nome)
-        self.input_endereco = QLineEdit()
-        self.input_endereco.setPlaceholderText("Endereço")
-        form_layout.addWidget(self.input_endereco)
-        self.btn_add = QPushButton("Adicionar")
-        self.btn_edit = QPushButton("Editar")
-        self.btn_delete = QPushButton("Excluir")
-        form_layout.addWidget(self.btn_add)
-        form_layout.addWidget(self.btn_edit)
-        form_layout.addWidget(self.btn_delete)
-        layout.addLayout(form_layout)
+
+        btn_layout = QHBoxLayout()
+        self.btn_add = QPushButton("Cadastrar Prédio")
+        self.btn_edit = QPushButton("Editar Prédio")
+        self.btn_delete = QPushButton("Excluir Prédio")
+        self.btn_exportar = QPushButton("Exportar CSV")
+        self.btn_exportar_pdf = QPushButton("Exportar PDF")
+        btn_layout.addWidget(self.btn_add)
+        btn_layout.addWidget(self.btn_edit)
+        btn_layout.addWidget(self.btn_delete)
+        btn_layout.addWidget(self.btn_exportar)
+        btn_layout.addWidget(self.btn_exportar_pdf)
+        layout.addLayout(btn_layout)
+
         self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["ID", "Nome", "Endereço"])
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["ID", "Nome"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
+        self.table.setColumnHidden(0, True)
         layout.addWidget(self.table)
         self.setLayout(layout)
-        self.table.itemSelectionChanged.connect(self.preencher_campos_edicao)
-        self.btn_add.clicked.connect(self.adicionar_predio)
+
+        self.btn_add.clicked.connect(self.cadastrar_predio)
         self.btn_edit.clicked.connect(self.editar_predio)
         self.btn_delete.clicked.connect(self.excluir_predio)
+        self.btn_exportar.clicked.connect(self.exportar_csv)
+        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         self.criar_tabela_predios()
         self.load_predios()
 
     def criar_tabela_predios(self):
-        execute_query(
-            '''
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS predios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT UNIQUE NOT NULL,
-                endereco TEXT
+                nome TEXT NOT NULL UNIQUE
             )
-            ''', ()
-        )
+        """)
+        conn.commit()
+        conn.close()
 
     def load_predios(self):
         self.table.setRowCount(0)
         try:
-            predios = execute_query("SELECT id, nome, endereco FROM predios ORDER BY nome", (), fetchall=True)
-            self.table.setRowCount(len(predios))
-            for i, predio in enumerate(predios):
-                self.table.setItem(i, 0, QTableWidgetItem(str(predio["id"])))
-                self.table.setItem(i, 1, QTableWidgetItem(predio["nome"]))
-                self.table.setItem(i, 2, QTableWidgetItem(predio["endereco"] if predio["endereco"] else ""))
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome FROM predios ORDER BY nome")
+            for row_idx, (pid, nome) in enumerate(cursor.fetchall()):
+                self.table.insertRow(row_idx)
+                self.table.setItem(row_idx, 0, QTableWidgetItem(str(pid)))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(str(nome)))
+            conn.close()
         except Exception as e:
-            QMessageBox.warning(self, "Erro", f"Erro ao carregar prédios: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar prédios: {e}")
 
-    def preencher_campos_edicao(self):
-        selected = self.table.currentRow()
-        if selected >= 0:
-            self.input_nome.setText(self.table.item(selected, 1).text())
-            self.input_endereco.setText(self.table.item(selected, 2).text())
-
-    def adicionar_predio(self):
-        nome = self.input_nome.text().strip()
-        endereco = self.input_endereco.text().strip()
-        if not nome:
-            QMessageBox.warning(self, "Aviso", "O nome do prédio é obrigatório.")
-            return
-        try:
-            execute_query("INSERT INTO predios (nome, endereco) VALUES (?, ?)", (nome, endereco))
-            QMessageBox.information(self, "Sucesso", "Prédio adicionado com sucesso.")
-            self.input_nome.clear()
-            self.input_endereco.clear()
-            self.load_predios()
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao adicionar prédio: {e}")
+    def cadastrar_predio(self):
+        dialog = PredioDialog()
+        if dialog.exec():
+            data = dialog.get_data()
+            if not data["nome"]:
+                QMessageBox.warning(self, "Erro", "Nome do prédio é obrigatório.")
+                return
+            try:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO predios (nome) VALUES (?)",
+                    (data["nome"],)
+                )
+                conn.commit()
+                conn.close()
+                QMessageBox.information(self, "Sucesso", "Prédio cadastrado com sucesso!")
+                self.load_predios()
+            except sqlite3.IntegrityError:
+                QMessageBox.warning(self, "Aviso", "Já existe um prédio com este nome!")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao cadastrar prédio: {e}")
 
     def editar_predio(self):
-        selected = self.table.currentRow()
-        if selected < 0:
-            QMessageBox.warning(self, "Erro", "Selecione um prédio para editar.")
+        selected = self.table.selectedItems()
+        if not selected:
+            QMessageBox.warning(self, "Aviso", "Selecione um prédio para editar!")
             return
-        predio_id = int(self.table.item(selected, 0).text())
-        novo_nome = self.input_nome.text().strip()
-        novo_endereco = self.input_endereco.text().strip()
-        if not novo_nome:
-            QMessageBox.warning(self, "Erro", "O nome do prédio não pode ser vazio.")
-            return
-        try:
-            execute_query("UPDATE predios SET nome=?, endereco=? WHERE id=?", (novo_nome, novo_endereco, predio_id))
-            QMessageBox.information(self, "Sucesso", "Prédio editado com sucesso.")
-            self.input_nome.clear()
-            self.input_endereco.clear()
-            self.load_predios()
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao editar prédio: {e}")
+        row = selected[0].row()
+        predio_id = int(self.table.item(row, 0).text())
+        nome = self.table.item(row, 1).text()
+        dialog = PredioDialog(nome)
+        if dialog.exec():
+            data = dialog.get_data()
+            if not data["nome"]:
+                QMessageBox.warning(self, "Erro", "Nome do prédio é obrigatório.")
+                return
+            try:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE predios SET nome=? WHERE id=?",
+                    (data["nome"], predio_id)
+                )
+                conn.commit()
+                conn.close()
+                QMessageBox.information(self, "Sucesso", "Prédio atualizado com sucesso!")
+                self.load_predios()
+            except sqlite3.IntegrityError:
+                QMessageBox.warning(self, "Aviso", "Nome de prédio já existe!")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao editar prédio: {e}")
 
     def excluir_predio(self):
-        selected = self.table.currentRow()
-        if selected < 0:
-            QMessageBox.warning(self, "Erro", "Selecione um prédio para excluir.")
+        selected = self.table.selectedItems()
+        if not selected:
+            QMessageBox.warning(self, "Aviso", "Selecione um prédio para excluir!")
             return
-        predio_id = int(self.table.item(selected, 0).text())
+        row = selected[0].row()
+        predio_id = int(self.table.item(row, 0).text())
+        nome = self.table.item(row, 1).text()
+        reply = QMessageBox.question(
+            self,
+            "Confirmar Exclusão",
+            f"Deseja realmente excluir o prédio '{nome}'?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
         try:
-            execute_query("DELETE FROM predios WHERE id=?", (predio_id,))
-            QMessageBox.information(self, "Sucesso", "Prédio excluído com sucesso.")
-            self.input_nome.clear()
-            self.input_endereco.clear()
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM predios WHERE id=?", (predio_id,))
+            conn.commit()
+            conn.close()
+            QMessageBox.information(self, "Sucesso", "Prédio excluído!")
             self.load_predios()
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao excluir prédio: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao excluir prédio: {e}")
+
+    def exportar_csv(self):
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
+        if caminho:
+            try:
+                with open(caminho, "w", encoding="utf-8") as f:
+                    f.write("Nome\n")
+                    for row in range(self.table.rowCount()):
+                        nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                        f.write(f"{nome}\n")
+                QMessageBox.information(self, "Exportação", "Exportação concluída!")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+
+    def exportar_pdf(self):
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
+        if not caminho:
+            return
+        try:
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib import colors
+            cabecalho = ["Nome"]
+            dados = [cabecalho]
+            for row in range(self.table.rowCount()):
+                nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                dados.append([nome])
+            pdf = SimpleDocTemplate(
+                caminho, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+            )
+            table = Table(dados, repeatRows=1)
+            style = TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ])
+            table.setStyle(style)
+            pdf.build([table])
+            QMessageBox.information(self, "Exportação PDF", "PDF exportado com sucesso!")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

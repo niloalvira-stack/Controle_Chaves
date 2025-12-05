@@ -1,14 +1,17 @@
+# interface/dash_main.py
+
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
     QHBoxLayout, QPushButton, QMessageBox, QLabel
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QPixmap
 from datetime import datetime
 
 from config import (
     APP_NAME, APP_VERSION, APP_DEVELOPER,
-    APP_COMPANY, APP_COPYRIGHT
+    APP_COMPANY, APP_COPYRIGHT, APP_LOGO_PATH
 )
 
 from controle.movimentacoes import listar_movimentacoes, MovimentacoesTab
@@ -29,10 +32,22 @@ from admin.log_viewer_tab import LogViewerTab
 class DashMain(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # título e ícone da janela
         self.setWindowTitle(f"{APP_NAME} - Dashboard")
+        self.setWindowIcon(QIcon(APP_LOGO_PATH))
         self.resize(1000, 700)
 
         main_layout = QVBoxLayout()
+
+        # ---- LOGO NO TOPO ----
+        lbl_logo = QLabel()
+        pixmap = QPixmap(APP_LOGO_PATH)
+        if not pixmap.isNull():
+            pixmap = pixmap.scaledToHeight(160, Qt.SmoothTransformation)
+            lbl_logo.setPixmap(pixmap)
+        lbl_logo.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(lbl_logo)
 
         # ---- PAINEL INFORMATIVO DO USUÁRIO ----
         info_user = get_current_user()  # {"login": ..., "nome": ..., "is_admin": ...}
@@ -44,7 +59,7 @@ class DashMain(QMainWindow):
         lbl_data = QLabel(f"Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         total_mov = len(listar_movimentacoes())
         lbl_total_mov = QLabel(f"Total de movimentações: {total_mov}")
-        pendentes = [row for row in listar_movimentacoes() if row[5] == "indisponível"]
+        pendentes = [row for row in listar_movimentacoes() if row[5] == 'indisponível']
         lbl_pendencias = QLabel(f"Chaves não devolvidas: {len(pendentes)}")
 
         main_layout.addWidget(lbl_usuario)
@@ -90,7 +105,7 @@ class DashMain(QMainWindow):
         footer_layout.addWidget(lbl_versao)
         main_layout.addLayout(footer_layout)
 
-        # ---- ESTILOS DOS BOTÕES (PADRÃO DO SISTEMA) ----
+        # ---- ESTILOS DOS BOTÕES ----
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -181,13 +196,14 @@ class DashMain(QMainWindow):
         QMessageBox.information(self, "Sobre", texto)
 
     def logout(self):
+        # encerra sessão e volta para a tela de login
         session_manager.logout()
         self.close()
-        # voltar para tela de login
         self.login_window = LoginWindow(self._on_login_success_again)
         self.login_window.show()
 
     def _on_login_success_again(self, user):
+        # chamado quando logar de novo após logout
         session_manager.login(user["login"], user["is_admin"])
         novo = DashMain()
         novo.showMaximized()

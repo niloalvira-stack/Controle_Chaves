@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView
 )
 from PyQt5.QtCore import QDate
+import os
 import sqlite3
 import csv
 from reportlab.lib.pagesizes import A4
@@ -10,7 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from datetime import datetime
 
-DB_NAME = "controle_chaves.db"
+from database_module import DB_NAME
 
 
 def formatar_data_br(data_str):
@@ -63,14 +64,13 @@ class RelatorioPorPeriodoTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(
-            ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+            ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
 
-        # estilos dos botões (mesmo padrão do resto do sistema)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -125,25 +125,37 @@ class RelatorioPorPeriodoTab(QWidget):
         fim = self.data_fim.date().toString("yyyy-MM-dd") + " 23:59:59"
         return inicio, fim
 
+    def _query_base(self):
+        """
+        Query base por período, com JOIN utilizadores e compatibilidade com dados antigos.
+        """
+        return """
+            SELECT m.id,
+                   m.chave,
+                   COALESCE(u.nome, m.usuario) AS utilizador,
+                   m.status,
+                   m.data_retirada,
+                   m.data_retorno
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            WHERE m.data_retirada >= ? AND m.data_retirada <= ?
+            ORDER BY m.data_retirada DESC
+        """
+
     def load_relatorio(self):
         inicio, fim = self._periodo()
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE data_retirada >= ? AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (inicio, fim))
+            cursor.execute(self._query_base(), (inicio, fim))
             rows = cursor.fetchall()
             conn.close()
 
             self.table.setRowCount(len(rows))
             for i, row in enumerate(rows):
-                # Ignora o ID
+                # row: [id, chave, utilizador, status, data_retirada, data_retorno]
                 for j, val in enumerate(row[1:]):
-                    if j in [3, 4]:  # Datas nas posições 3 e 4 após o ID
+                    if j in [3, 4]:  # datas nas posições 3 e 4 após o ID
                         val = formatar_data_br(val)
                     self.table.setItem(i, j, QTableWidgetItem(str(val) if val else ""))
         except Exception as e:
@@ -157,24 +169,18 @@ class RelatorioPorPeriodoTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE data_retirada >= ? AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (inicio, fim))
+            cursor.execute(self._query_base(), (inicio, fim))
             rows = cursor.fetchall()
             conn.close()
+
             with open(path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow([
-                    "Chave", "Usuário", "Status", "Retirada", "Devolução"
-                ])
+                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 for row in rows:
                     row = list(row)
-                    row[4] = formatar_data_br(row[4])  # Retirada
-                    row[5] = formatar_data_br(row[5])  # Devolução
-                    writer.writerow(row[1:])  # Ignora o campo ID
+                    row[4] = formatar_data_br(row[4])  # retirada
+                    row[5] = formatar_data_br(row[5])  # devolução
+                    writer.writerow(row[1:])  # ignora ID
             QMessageBox.information(self, "Sucesso", "Relatório exportado com sucesso!")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
@@ -187,34 +193,31 @@ class RelatorioPorPeriodoTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE data_retirada >= ? AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (inicio, fim))
+            cursor.execute(self._query_base(), (inicio, fim))
             rows = cursor.fetchall()
             conn.close()
-            cabecalho = ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+
+            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             tabela_dados = [cabecalho]
             for row in rows:
                 row = list(row)
                 row[4] = formatar_data_br(row[4])
                 row[5] = formatar_data_br(row[5])
-                tabela_dados.append([str(x) if x else "" for x in row[1:]])  # Ignora o campo ID
+                tabela_dados.append([str(x) if x else "" for x in row[1:]])  # ignora ID
+
             pdf = SimpleDocTemplate(
                 path, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
             )
             table = Table(tabela_dados, repeatRows=1)
             style = TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("FONTSIZE", (0,0), (-1,-1), 9),
-                ("ALIGN", (0,0), (-1,-1), "CENTER"),
-                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-                ("TOPPADDING", (0,0), (-1,-1), 2),
-                ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ])
             table.setStyle(style)
             pdf.build([table])

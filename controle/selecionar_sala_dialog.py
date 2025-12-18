@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
@@ -6,7 +7,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 
-DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
 
 
 class SelecionarSalaDialog(QDialog):

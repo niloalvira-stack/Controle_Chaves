@@ -1,13 +1,18 @@
+import os
+import sqlite3
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QDialog, QFormLayout, QLineEdit, QComboBox, QMessageBox, QFileDialog, QHeaderView, QDialogButtonBox, QLabel
+    QDialog, QFormLayout, QLineEdit, QComboBox, QMessageBox, QFileDialog, QHeaderView,
+    QDialogButtonBox, QLabel
 )
-import sqlite3
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 
-DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+# Caminho correto para o banco, relativo ao projeto
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+
 
 class AnexoDialog(QDialog):
     def __init__(self, predios, nome="", predio_id=None, parent=None):

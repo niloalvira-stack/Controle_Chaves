@@ -3,10 +3,15 @@ from PyQt5.QtWidgets import (
     QWidget, QLineEdit, QLabel, QPushButton, QVBoxLayout,
     QMessageBox, QDialog, QFormLayout, QDialogButtonBox
 )
-from . import get_user_by_login, verify_password, hash_password, show_info, show_warning
+
+from .autenticacao import (
+    get_user_by_login, verify_password, hash_password,
+    show_info, show_warning
+)
 from database_module import execute_query
 from .session import session_manager
 from utils.utils_log import log_acao
+from autenticacao.helpers_autenticacao import validar_login, get_current_user
 
 
 class ChangePasswordDialog(QDialog):
@@ -97,67 +102,116 @@ class LoginWindow(QWidget):
             return
 
         user = get_user_by_login(login)
-        if user:
-            user = dict(user)
-            senha_banco = user['senha']
-            print(f"Hash armazenado: {senha_banco}")
+        if not user:
+            QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
+            log_acao(f"Tentativa de login com usuário inexistente: '{login}'")
+            return
 
-            hash_valido = senha_banco and senha_banco.startswith("$2b$")
-            if not hash_valido:
-                log_acao(f"Login bloqueado: senha insegura detectada para usuário '{login}'")
-                show_warning(
-                    "Atenção",
-                    "Sua senha está salva de forma insegura. Você precisa trocá-la para continuar."
+        user = dict(user)
+        senha_banco = user["senha"]
+
+        # verifica se senha está em formato seguro (bcrypt, por exemplo)
+        hash_valido = senha_banco and senha_banco.startswith("$2b$")
+        if not hash_valido:
+            log_acao(
+                f"Login bloqueado: senha insegura detectada para usuário '{login}'"
+            )
+            show_warning(
+                "Atenção",
+                "Sua senha está salva de forma insegura. Você precisa trocá-la para continuar."
+            )
+            dialog = ChangePasswordDialog(user["id"])
+            if dialog.exec_() == QDialog.Accepted:
+                QMessageBox.information(
+                    self,
+                    "Sucesso",
+                    "Senha cadastrada com segurança! Faça login novamente."
                 )
+                log_acao(
+                    f"Senha atualizada para usuário '{login}' (senha antiga insegura)"
+                )
+                self.input_login.clear()
+                self.input_senha.clear()
+                return
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Aviso",
+                    "Troca de senha obrigatória cancelada."
+                )
+                log_acao(
+                    f"Usuário '{login}' cancelou troca de senha obrigatória"
+                )
+                return
+
+        senha_valida = verify_password(senha_banco, senha)
+        print(f"Senha válida? {senha_valida}")
+
+        if not senha_valida:
+            QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
+            log_acao(f"Tentativa de login inválida para usuário '{login}'")
+            return
+
+        try:
+            print("DEBUG: antes de verificar primeiro_login")
+            # Primeiro login exige troca de senha
+            if user.get("primeiro_login"):
+                print("DEBUG: caiu em primeiro_login")
+                log_acao(f"Primeiro login detectado para usuário '{login}'")
                 dialog = ChangePasswordDialog(user["id"])
-                if dialog.exec_() == QDialog.Accepted:
+                resultado = dialog.exec_()
+                if resultado == QDialog.Accepted:
                     QMessageBox.information(
                         self,
                         "Sucesso",
                         "Senha cadastrada com segurança! Faça login novamente."
                     )
-                    log_acao(f"Senha atualizada para usuário '{login}' (senha antiga insegura)")
-                    self.input_login.clear()
                     self.input_senha.clear()
+                    self.input_login.setFocus()
                     return
                 else:
-                    QMessageBox.warning(self, "Aviso", "Troca de senha obrigatória cancelada.")
-                    log_acao(f"Usuário '{login}' cancelou troca de senha obrigatória")
+                    show_warning(
+                        "Aviso",
+                        "É necessário trocar a senha para continuar."
+                    )
+                    log_acao(
+                        f"Usuário '{login}' recusou trocar a senha no primeiro login"
+                    )
+                    self.input_senha.clear()
+                    self.input_login.setFocus()
                     return
 
-            senha_valida = verify_password(senha_banco, senha)
-            print(f"Senha válida? {senha_valida}")
+            # Login normal (não é primeiro login)
+            print("DEBUG: antes de chamar validar_login")
+            if not validar_login(user["login"], senha):
+                print("DEBUG: validar_login retornou False")
+                QMessageBox.warning(
+                    self,
+                    "Erro",
+                    "Falha ao carregar sessão do usuário."
+                )
+                log_acao(
+                    f"Falha ao validar_login no helper para usuário '{login}'"
+                )
+                return
 
-            if senha_valida:
-                try:
-                    if user["primeiro_login"]:
-                        log_acao(f"Primeiro login detectado para usuário '{login}'")
-                        dialog = ChangePasswordDialog(user["id"])
-                        resultado = dialog.exec_()
-                        if resultado == QDialog.Accepted:
-                            session_manager.login(user["login"], user["is_admin"])
-                            log_acao(f"Login bem-sucedido (após troca de senha) para usuário '{login}'")
-                            self.on_login_success(user)
-                            self.close()
-                        else:
-                            show_warning("Aviso", "É necessário trocar a senha para continuar.")
-                            log_acao(f"Usuário '{login}' recusou trocar a senha no primeiro login")
-                            self.input_senha.clear()
-                            self.input_login.setFocus()
-                    else:
-                        session_manager.login(user["login"], user["is_admin"])
-                        QMessageBox.information(self, "Sucesso", "Login realizado com sucesso.")
-                        log_acao(f"Login bem-sucedido para usuário '{login}'")
-                        self.on_login_success(user)
-                        self.close()
-                except Exception:
-                    erro = traceback.format_exc()
-                    print(erro)
-                    log_acao(f"Erro interno após login para usuário '{login}': {erro}")
-                    show_warning("Erro", "Um erro interno ocorreu na transição de telas.")
-            else:
-                QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
-                log_acao(f"Tentativa de login inválida para usuário '{login}'")
-        else:
-            QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
-            log_acao(f"Tentativa de login com usuário inexistente: '{login}'")
+            print("DEBUG: antes de session_manager.login")
+            session_manager.login(user["login"])
+            QMessageBox.information(self, "Sucesso", "Login realizado com sucesso.")
+            log_acao(f"Login bem-sucedido para usuário '{login}'")
+
+            print("DEBUG: antes de on_login_success")
+            user_atual = get_current_user()
+            print("DEBUG user_atual após validar_login:", user_atual)
+            self.on_login_success(user_atual)
+            print("DEBUG: depois de on_login_success (antes de close)")
+            self.close()
+
+        except Exception:
+            erro = traceback.format_exc()
+            print(erro)
+            log_acao(f"Erro interno após login para usuário '{login}': {erro}")
+            show_warning(
+                "Erro",
+                "Um erro interno ocorreu na transição de telas."
+            )

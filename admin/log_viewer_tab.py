@@ -1,12 +1,8 @@
-import self
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton
-from utils.utils_log import LOG_FILE
-
-LOG_FILE = "controle_chaves.log"
-
 # admin/log_viewer_tab.py
+
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton
-from utils.utils_log import LOG_FILE
+from utils.utils_log import LOG_FILE  # aproveita o caminho já definido no utils_log
+
 
 class LogViewerTab(QWidget):
     def __init__(self):

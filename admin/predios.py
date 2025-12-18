@@ -1,10 +1,14 @@
+import os
+import sqlite3
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QDialog, QFormLayout, QLineEdit, QMessageBox, QFileDialog, QHeaderView, QLabel, QDialogButtonBox
 )
-import sqlite3
 
-DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+# Caminho correto para o banco, relativo ao projeto
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+
 
 class PredioDialog(QDialog):
     def __init__(self, nome="", parent=None):

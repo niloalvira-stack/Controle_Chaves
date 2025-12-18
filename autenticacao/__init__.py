@@ -1,4 +1,11 @@
-from .session import session_manager, is_admin, is_logged_in, get_current_user
+from .session import (
+    session_manager,
+    get_current_user,
+    is_admin,
+    get_user_id,
+    get_user_login,
+)
+
 from .autenticacao import (
     create_user,
     get_user_by_login,

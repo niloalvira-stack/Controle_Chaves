@@ -2,8 +2,8 @@
 import os
 from datetime import datetime
 
-# Pasta base do projeto
-BASE_DIR = r"C:\Controle_Chaves"
+# Pasta base do projeto (diretório deste arquivo -> sobe um nível)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
 # Caminho absoluto do arquivo de log
 LOG_FILE = os.path.join(BASE_DIR, "controle_chaves.log")
@@ -12,7 +12,7 @@ LOG_FILE = os.path.join(BASE_DIR, "controle_chaves.log")
 def log_acao(mensagem: str):
     """
     Registra uma linha no arquivo de log com data/hora em padrão brasileiro.
-    Exemplo de saída:
+    Exemplo:
     [27/11/2025 15:10:23] Mensagem aqui
     """
     try:
@@ -20,6 +20,4 @@ def log_acao(mensagem: str):
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"[{datahora}] {mensagem}\n")
     except Exception as e:
-        # Evita quebrar a aplicação por erro no log.
-        # Se quiser, pode imprimir no console:
         print(f"Falha ao gravar log: {e}")

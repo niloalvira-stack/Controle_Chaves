@@ -3,14 +3,17 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QHeaderView
 )
 from PyQt5.QtCore import QTimer
+import os
 import sqlite3
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from datetime import datetime
+from database_module import DB_NAME
 
-DB_NAME = "controle_chaves.db"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
 
 
 def formatar_data_br(valor):
@@ -44,7 +47,7 @@ class RelatoriosGeralTab(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Chave", "Usuário", "Status", "Retirada", "Devolução"])
+        self.table.setHorizontalHeaderLabels(["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setColumnHidden(0, True)  # Esconde a coluna ID na interface
         layout.addWidget(self.table)
@@ -57,7 +60,6 @@ class RelatoriosGeralTab(QWidget):
         self.timer.timeout.connect(self.load_relatorio)
         self.timer.start(5000)
 
-        # estilos dos botões (seguindo padrão da aba Movimentações)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -92,15 +94,28 @@ class RelatoriosGeralTab(QWidget):
             }
         """)
 
+    def _query_base(self):
+        """
+        Query base com JOIN utilizadores.
+        COALESCE mantém compatibilidade com dados antigos em m.usuario.
+        """
+        return """
+            SELECT m.id,
+                   m.chave,
+                   COALESCE(u.nome, m.usuario) AS utilizador,
+                   m.status,
+                   m.data_retirada,
+                   m.data_retorno
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            ORDER BY m.data_retirada DESC
+        """
+
     def load_relatorio(self):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
@@ -120,21 +135,17 @@ class RelatoriosGeralTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
             with open(path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
-                for _id, chave, usuario, status, data_ret, data_retorn in rows:
+                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
+                for _id, chave, utilizador, status, data_ret, data_retorn in rows:
                     writer.writerow([
                         chave,
-                        usuario,
+                        utilizador,
                         status,
                         formatar_data_br(data_ret),
                         formatar_data_br(data_retorn),
@@ -150,20 +161,16 @@ class RelatoriosGeralTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
-            cabecalho = ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             dados = [cabecalho]
-            for _id, chave, usuario, status, data_ret, data_retorn in rows:
+            for _id, chave, utilizador, status, data_ret, data_retorn in rows:
                 dados.append([
                     str(chave) if chave else "",
-                    str(usuario) if usuario else "",
+                    str(utilizador) if utilizador else "",
                     str(status) if status else "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_retorn),

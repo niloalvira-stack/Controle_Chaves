@@ -1,22 +1,28 @@
+# controle/movimentacoes.py
 import os
 import csv
 import sqlite3
 from datetime import datetime
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialog, QFormLayout, QLineEdit, QComboBox, QHeaderView,
-    QMessageBox, QFileDialog, QDateEdit, QDialogButtonBox, QLabel
+    QMessageBox, QFileDialog, QDateEdit, QDialogButtonBox, QLabel, QToolButton
 )
 from PyQt5.QtCore import QDate, QTimer
-from PyQt5.QtGui import QBrush, QColor, QIcon
+from PyQt5.QtGui import QBrush, QColor
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from utils import montar_display_sala_por_id
+from utils.validacao import email_valido
+from utils.utils import montar_display_sala_por_id
 from utils.utils_log import log_acao
-from .selecionar_sala_dialog import SelecionarSalaDialog  # diálogo modal
+from .selecionar_sala_dialog import SelecionarSalaDialog
 
-DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+ALERTA_HORAS = 4
 
 
 def formatar_data_br(data_str):
@@ -43,14 +49,14 @@ class FiltroMovimentacaoDialog(QDialog):
         self.data_fim.setDate(QDate.currentDate())
 
         self.input_usuario = QLineEdit()
-        self.input_usuario.setPlaceholderText("Qualquer usuário (opcional)")
+        self.input_usuario.setPlaceholderText("Qualquer utilizador (opcional)")
 
         self.combo_status = QComboBox()
         self.combo_status.addItems(["Todos", "disponível", "indisponível"])
 
         layout.addRow("Data Início:", self.data_inicio)
         layout.addRow("Data Fim:", self.data_fim)
-        layout.addRow("Usuário:", self.input_usuario)
+        layout.addRow("Utilizador:", self.input_usuario)
         layout.addRow("Status:", self.combo_status)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -63,26 +69,58 @@ class FiltroMovimentacaoDialog(QDialog):
     def get_filters(self):
         inicio = self.data_inicio.date().toString("yyyy-MM-dd") + " 00:00:00"
         fim = self.data_fim.date().toString("yyyy-MM-dd") + " 23:59:59"
-        usuario = self.input_usuario.text().strip() or None
+        usuario = self.input_usuario.text().strip().lower() or None
         status = self.combo_status.currentText()
         if status == "Todos":
             status = None
         return {"data_ini": inicio, "data_fim": fim, "usuario": usuario, "status": status}
 
 
+def criar_tabela_utilizadores():
+    """
+    Cria/ajusta a tabela utilizadores para ter coluna 'ativo' com default 1.
+    """
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS utilizadores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome  TEXT NOT NULL,
+            email TEXT,
+            ativo INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    cur.execute("PRAGMA table_info(utilizadores)")
+    cols = [r[1] for r in cur.fetchall()]
+    if "ativo" not in cols:
+        cur.execute("ALTER TABLE utilizadores ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1")
+    conn.commit()
+    conn.close()
+
+
 def criar_tabela_movimentacoes():
+    """
+    Cria/ajusta movimentacoes, mantendo usuario/email para compatibilidade
+    e adicionando utilizador_id para o modelo novo.
+    """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movimentacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             chave TEXT NOT NULL,
-            usuario TEXT NOT NULL,
+            usuario TEXT,
+            email TEXT,
             data_retirada TIMESTAMP,
             data_retorno TIMESTAMP,
-            status TEXT DEFAULT 'disponível'
+            status TEXT DEFAULT 'disponível',
+            alerta_enviado INTEGER DEFAULT 0
         )
     """)
+    cursor.execute("PRAGMA table_info(movimentacoes)")
+    cols = [r[1] for r in cursor.fetchall()]
+    if "utilizador_id" not in cols:
+        cursor.execute("ALTER TABLE movimentacoes ADD COLUMN utilizador_id INTEGER")
     conn.commit()
     conn.close()
 
@@ -91,9 +129,16 @@ def listar_movimentacoes():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, chave, usuario, data_retirada, data_retorno, status
-        FROM movimentacoes
-        ORDER BY data_retirada DESC
+        SELECT m.id,
+               m.chave,
+               COALESCE(u.nome, m.usuario) AS utilizador,
+               COALESCE(m.email, u.email) AS email,
+               m.data_retirada,
+               m.data_retorno,
+               m.status
+        FROM movimentacoes m
+        LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+        ORDER BY m.data_retirada DESC
     """)
     rows = cursor.fetchall()
     conn.close()
@@ -104,43 +149,73 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     query = """
-        SELECT id, chave, usuario, data_retirada, data_retorno, status 
-        FROM movimentacoes WHERE 1=1
+        SELECT m.id,
+               m.chave,
+               COALESCE(u.nome, m.usuario) AS utilizador,
+               COALESCE(m.email, u.email) AS email,
+               m.data_retirada,
+               m.data_retorno,
+               m.status
+        FROM movimentacoes m
+        LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+        WHERE 1=1
     """
     params = []
     if chave:
-        query += " AND chave LIKE ?"
+        query += " AND m.chave LIKE ?"
         params.append(f"%{chave}%")
     if usuario:
-        query += " AND usuario LIKE ?"
+        usuario = usuario.strip().lower()
+        query += " AND LOWER(COALESCE(u.nome, m.usuario)) LIKE ?"
         params.append(f"%{usuario}%")
     if data_ini:
-        query += " AND (data_retirada >= ?)"
+        query += " AND (m.data_retirada >= ?)"
         params.append(data_ini)
     if data_fim:
-        query += " AND (data_retirada <= ?)"
+        query += " AND (m.data_retirada <= ?)"
         params.append(data_fim)
     if status and status.lower() not in ["todos", ""]:
-        query += " AND status = ?"
+        query += " AND m.status = ?"
         params.append(status)
-    query += " ORDER BY data_retirada DESC"
+    query += " ORDER BY m.data_retirada DESC"
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
     return rows
 
 
-def registrar_retirada(sala_id, chave_display, usuario):
-    """
-    Registra movimentação de retirada e marca a sala como indisponível.
-    """
+def registrar_retirada(sala_id, chave_display, utilizador_id, email):
+    email = (email or "").strip().lower()
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     data_retirada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
-        "INSERT INTO movimentacoes (chave, usuario, data_retirada, status) VALUES (?, ?, ?, ?)",
-        (chave_display, usuario, data_retirada, "indisponível")
+        "SELECT nome, ativo FROM utilizadores WHERE id = ?",
+        (utilizador_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Utilizador id={utilizador_id} não encontrado na tabela utilizadores")
+    nome_utilizador, ativo = row
+    if not ativo:
+        conn.close()
+        raise ValueError(f"Utilizador id={utilizador_id} está desativado e não pode retirar chaves")
+
+    if not nome_utilizador:
+        conn.close()
+        raise ValueError(f"Utilizador id={utilizador_id} não possui nome válido")
+
+    cursor.execute(
+        """
+        INSERT INTO movimentacoes (
+            chave, utilizador_id, usuario, email, data_retirada, status, alerta_enviado
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 0)
+        """,
+        (chave_display, utilizador_id, nome_utilizador, email, data_retirada, "indisponível")
     )
 
     cursor.execute(
@@ -153,9 +228,6 @@ def registrar_retirada(sala_id, chave_display, usuario):
 
 
 def registrar_devolucao(mov_id, chave, sala_id):
-    """
-    Registra devolução na movimentação e marca a sala como disponível.
-    """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     data_retorno = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -177,13 +249,48 @@ def registrar_devolucao(mov_id, chave, sala_id):
 class MovimentacoesTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.sala_id_atual = None  # id da sala escolhida no diálogo
+        self.sala_id_atual = None
+        print("MovimentacoesTab.__init__ entrou")
+
         self.init_ui()
-        criar_tabela_movimentacoes()
-        self.carregar_movimentacoes()
+        print("UI criada")
+
+        try:
+            criar_tabela_utilizadores()
+            criar_tabela_movimentacoes()
+            print("Tabelas criadas")
+            self.carregar_movimentacoes()
+            print("Movimentações carregadas")
+        except Exception as e:
+            log_acao(f"Erro ao inicializar tabela/carregar movimentações: {e}")
+            QMessageBox.critical(self, "Erro", f"Falha ao carregar movimentações:\n{e}")
+
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.carregar_movimentacoes)
         self.timer.start(5000)
+
+    # ===== utilitário para acessar DashMain =====
+    def _get_dash_main(self):
+        from interface.dash_main import DashMain  # import local, evita ciclo
+        janela = self.parentWidget()
+        while janela is not None and not isinstance(janela, DashMain):
+            janela = janela.parentWidget()
+        return janela
+
+    def acao_verificar_pendencias(self):
+        qtd = verificar_pendencias_e_enviar_emails()
+        if qtd > 0:
+            QMessageBox.information(
+                self,
+                "Pendências",
+                f"Foram encontradas {qtd} pendência(s) em atraso (registradas no log)."
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Pendências",
+                "Nenhuma pendência em atraso encontrada."
+            )
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -192,7 +299,6 @@ class MovimentacoesTab(QWidget):
 
         form_layout = QHBoxLayout()
 
-        # Campo de sala selecionada + botão para abrir o diálogo
         self.label_sala_selecionada = QLineEdit()
         self.label_sala_selecionada.setReadOnly(True)
 
@@ -204,12 +310,21 @@ class MovimentacoesTab(QWidget):
         form_layout.addWidget(self.label_sala_selecionada)
         form_layout.addWidget(self.btn_escolher_sala)
 
-        # Usuário
-        self.input_usuario = QLineEdit()
-        self.input_usuario.setPlaceholderText("Usuário")
-        form_layout.addWidget(self.input_usuario)
+        self.combo_utilizador = QComboBox()
+        self.combo_utilizador.setEditable(False)
 
-        # Botões de ação
+        self.btn_novo_utilizador = QToolButton()
+        self.btn_novo_utilizador.setText("+")
+        self.btn_novo_utilizador.setToolTip("Cadastrar novo utilizador")
+        self.btn_novo_utilizador.clicked.connect(self.cadastrar_utilizador_rapido)
+
+        form_layout.addWidget(self.combo_utilizador)
+        form_layout.addWidget(self.btn_novo_utilizador)
+
+        self.input_email = QLineEdit()
+        self.input_email.setPlaceholderText("E-mail")
+        form_layout.addWidget(self.input_email)
+
         self.btn_retirar = QPushButton("Registrar Retirada")
         self.btn_retirar.setObjectName("btnRetirar")
         self.btn_retirar.clicked.connect(self.adicionar_movimentacao)
@@ -222,18 +337,24 @@ class MovimentacoesTab(QWidget):
         form_layout.addWidget(self.btn_devolver)
         layout.addLayout(form_layout)
 
-        # Botão de filtro
         filter_btn_box = QHBoxLayout()
         self.btn_filtrar = QPushButton("Filtrar Movimentações")
         self.btn_filtrar.setObjectName("btnFiltrar")
         self.btn_filtrar.clicked.connect(self.abrir_filtro_modal)
         filter_btn_box.addWidget(self.btn_filtrar)
+
+        self.btn_verificar_pendencias = QPushButton("Verificar pendências")
+        self.btn_verificar_pendencias.setObjectName("btnVerificarPendencias")
+        self.btn_verificar_pendencias.clicked.connect(self.acao_verificar_pendencias)
+        filter_btn_box.addWidget(self.btn_verificar_pendencias)
+
         layout.addLayout(filter_btn_box)
 
-        # Tabela
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Chave", "Usuário", "Retirada", "Devolução", "Status"])
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setColumnHidden(0, True)
@@ -241,12 +362,11 @@ class MovimentacoesTab(QWidget):
 
         self.setLayout(layout)
 
-        # Estilo visual dos botões
         self.setStyleSheet("""
             QPushButton {
-                padding: 10px 24px;          /* altura e largura maiores */
-                min-height: 34px;            /* altura mínima do botão */
-                min-width: 140px;            /* largura mínima */
+                padding: 10px 24px;
+                min-height: 34px;
+                min-width: 140px;
                 border-radius: 6px;
                 border: 1px solid #888;
                 font-weight: 500;
@@ -282,18 +402,75 @@ class MovimentacoesTab(QWidget):
                 background-color: #0d47a1;
             }
 
-            QPushButton#btnFiltrar {
+            QPushButton#btnFiltrar, QPushButton#btnVerificarPendencias {
                 background-color: #f9a825;
                 color: #333333;
                 border: 1px solid #f57f17;
             }
-            QPushButton#btnFiltrar:hover {
+            QPushButton#btnFiltrar:hover, QPushButton#btnVerificarPendencias:hover {
                 background-color: #fbc02d;
             }
-            QPushButton#btnFiltrar:pressed {
+            QPushButton#btnFiltrar:pressed, QPushButton#btnVerificarPendencias:pressed {
                 background-color: #f57f17;
             }
         """)
+
+        self.load_utilizadores_combo()
+
+    def load_utilizadores_combo(self):
+        self.combo_utilizador.clear()
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, nome, email
+            FROM utilizadores
+            WHERE ativo = 1
+            ORDER BY nome
+        """)
+        rows = cur.fetchall()
+        conn.close()
+
+        self.combo_utilizador.addItem("Selecione o utilizador...", None)
+        for uid, nome, email in rows:
+            display = f"{nome} ({email})" if email else nome
+            self.combo_utilizador.addItem(display, uid)
+
+    def cadastrar_utilizador_rapido(self):
+        from admin.utilizadores_tab import UtilizadorDialog
+
+        dialog = UtilizadorDialog(self)
+        if dialog.exec():
+            dados = dialog.get_dados()
+            nome = dados["nome"]
+            email = dados["email"]
+
+            if not nome:
+                QMessageBox.warning(self, "Erro", "Nome do utilizador é obrigatório.")
+                return
+
+            try:
+                conn = sqlite3.connect(DB_NAME)
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO utilizadores (nome, email, ativo) VALUES (?, ?, 1)",
+                    (nome, email),
+                )
+                novo_id = cur.lastrowid
+                conn.commit()
+                conn.close()
+
+                self.load_utilizadores_combo()
+                for idx in range(self.combo_utilizador.count()):
+                    if self.combo_utilizador.itemData(idx) == novo_id:
+                        self.combo_utilizador.setCurrentIndex(idx)
+                        break
+
+                QMessageBox.information(self, "Utilizador", "Utilizador cadastrado com sucesso!")
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Utilizador cadastrado")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao cadastrar utilizador:\n{e}")
 
     def abrir_dialogo_salas(self):
         dlg = SelecionarSalaDialog(self)
@@ -311,64 +488,70 @@ class MovimentacoesTab(QWidget):
             self.exibir_historico(resultados)
 
     def carregar_movimentacoes(self):
-        self.exibir_historico(listar_movimentacoes())
+        historico = listar_movimentacoes()
+        self.exibir_historico(historico)
 
     def exibir_historico(self, historico):
         self.table.setRowCount(0)
         now = datetime.now()
-        for row_data in historico:
-            row_idx = self.table.rowCount()
+
+        for row_idx, row_data in enumerate(historico):
             self.table.insertRow(row_idx)
+
             for col_idx, value in enumerate(row_data):
-                if col_idx in [3, 4]:
+                if col_idx in [4, 5]:
                     value = formatar_data_br(value)
+
                 item = QTableWidgetItem(str(value if value else ""))
-                if col_idx == 5:
-                    status = row_data[5]
-                    icone = ""
+
+                if col_idx == 6:
+                    status = row_data[6] or ""
                     if status == "disponível":
                         item.setBackground(QBrush(QColor(144, 238, 144)))
-                        icone = "check.png"
                     elif status == "indisponível":
-                        retirada_str = row_data[3]
+                        retirada_str = row_data[4]
                         try:
                             if retirada_str:
                                 retirada_dt = datetime.strptime(retirada_str, "%Y-%m-%d %H:%M:%S")
                                 diff_horas = (now - retirada_dt).total_seconds() / 3600
-                                if diff_horas > 24:
-                                    item.setBackground(QBrush(QColor(255, 215, 0)))
-                                    icone = "alert.png"
-                                else:
+                                if diff_horas >= ALERTA_HORAS:
                                     item.setBackground(QBrush(QColor(255, 120, 120)))
-                                    icone = "warning.png"
+                                else:
+                                    item.setBackground(QBrush(QColor(255, 215, 0)))
                             else:
-                                item.setBackground(QBrush(QColor(255, 120, 120)))
-                                icone = "warning.png"
+                                item.setBackground(QBrush(QColor(255, 215, 0)))
                         except Exception:
-                            item.setBackground(QBrush(QColor(255, 120, 120)))
-                            icone = "warning.png"
-                    if icone and os.path.exists(f"icons/{icone}"):
-                        item.setIcon(QIcon(f"icons/{icone}"))
+                            item.setBackground(QBrush(QColor(255, 215, 0)))
+
                 self.table.setItem(row_idx, col_idx, item)
 
     def adicionar_movimentacao(self):
         sala_id = self.sala_id_atual
-        usuario = self.input_usuario.text().strip()
+        utilizador_id = self.combo_utilizador.currentData()
+        email = self.input_email.text().strip().lower()
 
         if not sala_id:
             QMessageBox.warning(self, "Erro", "Selecione uma sala para registrar a retirada.")
-            log_acao(f"Tentativa de retirada inválida: sala_id={sala_id}, usuario='{usuario}'")
+            log_acao(f"Tentativa de retirada inválida: sala_id={sala_id}, utilizador_id={utilizador_id}, email='{email}'")
             return
-        if not usuario:
-            QMessageBox.warning(self, "Erro", "Preencha o usuário.")
-            log_acao(f"Tentativa de retirada com usuário vazio: sala_id={sala_id}")
+
+        if utilizador_id is None:
+            QMessageBox.warning(self, "Erro", "Selecione o utilizador.")
+            log_acao(f"Tentativa de retirada com utilizador não selecionado: sala_id={sala_id}, email='{email}'")
+            return
+
+        if email and not email_valido(email):
+            QMessageBox.warning(self, "Erro", "Informe um e-mail válido.")
+            log_acao(
+                f"Tentativa de retirada com e-mail inválido: sala_id={sala_id}, utilizador_id={utilizador_id}, email='{email}'"
+            )
             return
 
         chave_registro = montar_display_sala_por_id(sala_id)
 
         try:
-            registrar_retirada(sala_id, chave_registro, usuario)
-            log_acao(f"Retirada registrada: chave='{chave_registro}', usuario='{usuario}'")
+            registrar_retirada(sala_id, chave_registro, utilizador_id, email)
+            log_acao(f"Retirada registrada: chave='{chave_registro}', utilizador_id={utilizador_id}, email='{email}'")
             QMessageBox.information(
                 self,
                 "Sucesso",
@@ -376,16 +559,20 @@ class MovimentacoesTab(QWidget):
             )
             self.sala_id_atual = None
             self.label_sala_selecionada.clear()
-            self.input_usuario.clear()
+            self.combo_utilizador.setCurrentIndex(0)
+            self.input_email.clear()
             self.carregar_movimentacoes()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Retirada registrada")
         except Exception as e:
-            log_acao(f"Erro ao registrar retirada: chave='{chave_registro}', usuario='{usuario}', erro={e}")
+            log_acao(
+                f"Erro ao registrar retirada: chave='{chave_registro}', utilizador_id={utilizador_id}, email='{email}', erro={e}"
+            )
             QMessageBox.critical(self, "Erro", f"Falha ao registrar retirada:\n{e}")
 
     def _obter_sala_id_por_display(self, display):
-        """
-        Localiza o id da sala a partir do texto de display (mesmo padrão do montar_display_sala_por_id).
-        """
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM salas")
@@ -405,9 +592,15 @@ class MovimentacoesTab(QWidget):
             return
 
         row = selected[0].row()
-        mov_id = int(self.table.item(row, 0).text())
+        item_id = self.table.item(row, 0)
+        if not item_id or not item_id.text().strip().isdigit():
+            QMessageBox.warning(self, "Erro", "Registro selecionado não possui ID válido.")
+            log_acao("Tentativa de devolução em linha sem ID válido")
+            return
+
+        mov_id = int(item_id.text().strip())
         chave_nome = self.table.item(row, 1).text()
-        status = self.table.item(row, 5).text()
+        status = self.table.item(row, 6).text()
 
         if status == "disponível":
             QMessageBox.information(self, "Info", "Esta movimentação já está devolvida!")
@@ -425,6 +618,10 @@ class MovimentacoesTab(QWidget):
             log_acao(f"Devolução registrada: mov_id={mov_id}, chave='{chave_nome}'")
             QMessageBox.information(self, "Sucesso", "Devolução registrada!")
             self.carregar_movimentacoes()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Devolução registrado")  # texto que desejar
         except Exception as e:
             log_acao(f"Erro ao registrar devolução: mov_id={mov_id}, chave='{chave_nome}', erro={e}")
             QMessageBox.critical(self, "Erro", f"Falha ao registrar devolução:\n{e}")
@@ -447,13 +644,16 @@ class MovimentacoesTab(QWidget):
             dados = self.obter_dados_da_tabela()
             with open(caminho, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["ID", "Chave", "Usuário", "Retirada", "Devolução", "Status"])
+                writer.writerow(["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"])
                 for row in dados:
                     row = list(row)
-                    row[3] = formatar_data_br(row[3])
                     row[4] = formatar_data_br(row[4])
+                    row[5] = formatar_data_br(row[5])
                     writer.writerow(row)
             QMessageBox.information(self, "Exportação", "Movimentações exportadas para CSV com sucesso!")
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação CSV concluída")
 
     def exportar_pdf(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar como PDF", "", "PDF Files (*.pdf)")
@@ -464,14 +664,14 @@ class MovimentacoesTab(QWidget):
             c.setFont("Helvetica-Bold", 16)
             c.drawString(50, height - 50, "Relatório de Movimentações")
             c.setFont("Helvetica", 12)
-            cabecalho = ["ID", "Chave", "Usuário", "Retirada", "Devolução", "Status"]
+            cabecalho = ["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"]
             y = height - 80
             c.drawString(50, y, " | ".join(cabecalho))
             y -= 20
             for row in dados:
                 row = list(row)
-                row[3] = formatar_data_br(row[3])
                 row[4] = formatar_data_br(row[4])
+                row[5] = formatar_data_br(row[5])
                 c.drawString(50, y, " | ".join([str(x) if x else "" for x in row]))
                 y -= 20
                 if y < 50:
@@ -479,3 +679,47 @@ class MovimentacoesTab(QWidget):
                     y = height - 50
             c.save()
             QMessageBox.information(self, "Exportação", "Movimentações exportadas para PDF com sucesso!")
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF concluída")
+
+
+def verificar_pendencias_e_enviar_emails():
+    """
+    Verifica chaves indisponíveis acima do limite (>= ALERTA_HORAS)
+    sem enviar e-mail; apenas registra no log e retorna a quantidade.
+    """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, chave, usuario, email, data_retirada, alerta_enviado
+        FROM movimentacoes
+        WHERE status = 'indisponível'
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    now = datetime.now()
+    pendencias_encontradas = 0
+
+    for mov_id, chave, usuario, email, data_retirada, alerta_enviado in rows:
+        if not data_retirada:
+            continue
+
+        try:
+            retirada_dt = datetime.strptime(data_retirada, "%Y-%m-%d %H:%M:%S")
+            diff_horas = (now - retirada_dt).total_seconds() / 3600
+        except Exception as e:
+            log_acao(f"Erro ao parsear data_retirada mov_id={mov_id}: {e}")
+            continue
+
+        if diff_horas >= ALERTA_HORAS:
+            log_acao(
+                f"Pendência detectada (SEM envio de e-mail): "
+                f"mov_id={mov_id}, chave='{chave}', usuario='{usuario}', "
+                f"email='{email}', atraso={diff_horas:.2f}h"
+            )
+            pendencias_encontradas += 1
+
+    return pendencias_encontradas

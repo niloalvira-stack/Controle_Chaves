@@ -9,9 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from datetime import datetime
-
-DB_NAME = "controle_chaves.db"
-
+from database_module import DB_NAME  # usa DB_NAME central
 
 def formatar_data_br(data_str):
     if not data_str:
@@ -42,13 +40,12 @@ class RelatorioPendenciasTab(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
+        self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
 
-        # estilos dos botões (mesmo padrão das outras abas)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -92,25 +89,37 @@ class RelatorioPendenciasTab(QWidget):
         self.timer.timeout.connect(self.load_relatorio)
         self.timer.start(5000)
 
+    def _query_base(self):
+        """
+        Pendências: status 'indisponível', com JOIN utilizadores.
+        COALESCE garante compatibilidade com dados antigos.
+        """
+        return """
+            SELECT m.chave,
+                   COALESCE(u.nome, m.usuario) AS utilizador,
+                   m.status,
+                   m.data_retirada,
+                   m.data_retorno
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            WHERE m.status = 'indisponível'
+            ORDER BY m.data_retirada DESC
+        """
+
     def load_relatorio(self):
         try:
             self.table.setRowCount(0)
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE status = 'indisponível'
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
             self.table.setRowCount(len(rows))
-            for i, (chave, usuario, status, data_ret, data_dev) in enumerate(rows):
+            for i, (chave, utilizador, status, data_ret, data_dev) in enumerate(rows):
                 valores = [
                     chave or "",
-                    usuario or "",
+                    utilizador or "",
                     status or "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_dev),
@@ -127,22 +136,17 @@ class RelatorioPendenciasTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE status = 'indisponível'
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
             with open(path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
-                for chave, usuario, status, data_ret, data_dev in rows:
+                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
+                for chave, utilizador, status, data_ret, data_dev in rows:
                     writer.writerow([
                         chave or "",
-                        usuario or "",
+                        utilizador or "",
                         status or "",
                         formatar_data_br(data_ret),
                         formatar_data_br(data_dev),
@@ -158,21 +162,16 @@ class RelatorioPendenciasTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE status = 'indisponível'
-                ORDER BY data_retirada DESC
-            """)
+            cursor.execute(self._query_base())
             rows = cursor.fetchall()
             conn.close()
 
-            cabecalho = ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             tabela_dados = [cabecalho]
-            for chave, usuario, status, data_ret, data_dev in rows:
+            for chave, utilizador, status, data_ret, data_dev in rows:
                 tabela_dados.append([
                     chave or "",
-                    usuario or "",
+                    utilizador or "",
                     status or "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_dev),

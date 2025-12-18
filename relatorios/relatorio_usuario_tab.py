@@ -4,13 +4,16 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QTimer
 from datetime import datetime
+import os
 import sqlite3
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
+from database_module import DB_NAME
 
-DB_NAME = "controle_chaves.db"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
 
 
 def formatar_data_br(valor):
@@ -28,7 +31,7 @@ class RelatorioPorUsuarioTab(QWidget):
         layout = QVBoxLayout(self)
 
         filtro_layout = QHBoxLayout()
-        filtro_layout.addWidget(QLabel("Usuário:"))
+        filtro_layout.addWidget(QLabel("Utilizador:"))
         self.cb_usuario = QComboBox()
         filtro_layout.addWidget(self.cb_usuario)
 
@@ -52,7 +55,7 @@ class RelatorioPorUsuarioTab(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
+        self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
 
@@ -64,7 +67,6 @@ class RelatorioPorUsuarioTab(QWidget):
         self.timer.timeout.connect(self.refresh)
         self.timer.start(5000)
 
-        # estilos dos botões (mesmo padrão das outras abas)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -113,45 +115,74 @@ class RelatorioPorUsuarioTab(QWidget):
         """)
 
     def refresh(self):
-        usuario_atual = self.cb_usuario.currentText()
+        usuario_id_atual = self.cb_usuario.currentData()
         self.load_usuarios()
-        if usuario_atual:
-            idx = self.cb_usuario.findText(usuario_atual)
-            if idx >= 0:
-                self.cb_usuario.setCurrentIndex(idx)
+        if usuario_id_atual is not None:
+            for idx in range(self.cb_usuario.count()):
+                if self.cb_usuario.itemData(idx) == usuario_id_atual:
+                    self.cb_usuario.setCurrentIndex(idx)
+                    break
         self.load_relatorio()
 
     def load_usuarios(self):
-        usuario_atual = self.cb_usuario.currentText()
+        usuario_id_atual = self.cb_usuario.currentData()
         self.cb_usuario.blockSignals(True)
         self.cb_usuario.clear()
-        self.cb_usuario.addItem("[Selecione um usuário]")
+        self.cb_usuario.addItem("[Selecione um utilizador]", None)
+
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute("SELECT DISTINCT usuario FROM movimentacoes ORDER BY usuario")
-        usuarios = [row[0] for row in c.fetchall()]
-        self.cb_usuario.addItems(usuarios)
-        if usuario_atual:
-            idx = self.cb_usuario.findText(usuario_atual)
-            if idx >= 0:
-                self.cb_usuario.setCurrentIndex(idx)
-        self.cb_usuario.blockSignals(False)
+        # lista todos os utilizadores que têm alguma movimentação (ou todos, se preferir)
+        c.execute("""
+            SELECT DISTINCT u.id, u.nome
+            FROM utilizadores u
+            JOIN movimentacoes m ON m.utilizador_id = u.id
+            ORDER BY u.nome
+        """)
+        rows = c.fetchall()
         conn.close()
 
+        for uid, nome in rows:
+            self.cb_usuario.addItem(nome, uid)
+
+        if usuario_id_atual is not None:
+            for idx in range(self.cb_usuario.count()):
+                if self.cb_usuario.itemData(idx) == usuario_id_atual:
+                    self.cb_usuario.setCurrentIndex(idx)
+                    break
+
+        self.cb_usuario.blockSignals(False)
+
+    def _query_base(self):
+        """
+        Query base por utilizador, com JOIN utilizadores e compatibilidade com dados antigos.
+        """
+        return """
+            SELECT m.chave,
+                   COALESCE(u.nome, m.usuario) AS utilizador,
+                   m.status,
+                   m.data_retirada,
+                   m.data_retorno
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            WHERE u.id = ?
+               OR (u.id IS NULL AND m.usuario = ?)
+            ORDER BY m.data_retirada DESC
+        """
+
     def load_relatorio(self):
-        usuario = self.cb_usuario.currentText()
-        if usuario == "[Selecione um usuário]" or not usuario:
+        idx = self.cb_usuario.currentIndex()
+        usuario_id = self.cb_usuario.itemData(idx)
+        usuario_nome = self.cb_usuario.currentText()
+
+        if usuario_id is None or self.cb_usuario.currentText().startswith("[Selecione"):
             self.table.setRowCount(0)
             return
+
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE usuario = ?
-                ORDER BY data_retirada DESC
-            """, (usuario,))
+            cursor.execute(self._query_base(), (usuario_id, usuario_nome))
             rows = cursor.fetchall()
             conn.close()
 
@@ -168,27 +199,24 @@ class RelatorioPorUsuarioTab(QWidget):
         path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-        usuario = self.cb_usuario.currentText()
-        if usuario == "[Selecione um usuário]" or not usuario:
-            QMessageBox.warning(self, "Atenção", "Selecione um usuário para exportar.")
+        idx = self.cb_usuario.currentIndex()
+        usuario_id = self.cb_usuario.itemData(idx)
+        usuario_nome = self.cb_usuario.currentText()
+        if usuario_id is None or self.cb_usuario.currentText().startswith("[Selecione"):
+            QMessageBox.warning(self, "Atenção", "Selecione um utilizador para exportar.")
             return
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE usuario = ?
-                ORDER BY data_retirada DESC
-            """, (usuario,))
+            cursor.execute(self._query_base(), (usuario_id, usuario_nome))
             rows = cursor.fetchall()
             conn.close()
 
             linhas = []
-            for chave, usuario, status, data_ret, data_retorn in rows:
+            for chave, utilizador, status, data_ret, data_retorn in rows:
                 linhas.append([
                     chave,
-                    usuario,
+                    utilizador,
                     status,
                     formatar_data_br(data_ret),
                     formatar_data_br(data_retorn),
@@ -196,7 +224,7 @@ class RelatorioPorUsuarioTab(QWidget):
 
             with open(path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
+                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 writer.writerows(linhas)
             QMessageBox.information(self, "Sucesso", "Relatório exportado com sucesso!")
         except Exception as e:
@@ -206,28 +234,25 @@ class RelatorioPorUsuarioTab(QWidget):
         path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF Files (*.pdf)")
         if not path:
             return
-        usuario = self.cb_usuario.currentText()
-        if usuario == "[Selecione um usuário]" or not usuario:
-            QMessageBox.warning(self, "Atenção", "Selecione um usuário para exportar.")
+        idx = self.cb_usuario.currentIndex()
+        usuario_id = self.cb_usuario.itemData(idx)
+        usuario_nome = self.cb_usuario.currentText()
+        if usuario_id is None or self.cb_usuario.currentText().startswith("[Selecione"):
+            QMessageBox.warning(self, "Atenção", "Selecione um utilizador para exportar.")
             return
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE usuario = ?
-                ORDER BY data_retirada DESC
-            """, (usuario,))
+            cursor.execute(self._query_base(), (usuario_id, usuario_nome))
             rows = cursor.fetchall()
             conn.close()
 
-            cabecalho = ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             dados = [cabecalho]
-            for chave, usuario, status, data_ret, data_retorn in rows:
+            for chave, utilizador, status, data_ret, data_retorn in rows:
                 dados.append([
                     str(chave) if chave else "",
-                    str(usuario) if usuario else "",
+                    str(utilizador) if utilizador else "",
                     str(status) if status else "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_retorn),
@@ -238,14 +263,14 @@ class RelatorioPorUsuarioTab(QWidget):
             )
             table = Table(dados, repeatRows=1)
             style = TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("FONTSIZE", (0,0), (-1,-1), 9),
-                ("ALIGN", (0,0), (-1,-1), "CENTER"),
-                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-                ("TOPPADDING", (0,0), (-1,-1), 2),
-                ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ])
             table.setStyle(style)
             pdf.build([table])

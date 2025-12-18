@@ -1,7 +1,10 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QPushButton, QFileDialog, QMessageBox, QHBoxLayout
+    QWidget, QVBoxLayout, QTabWidget, QPushButton,
+    QFileDialog, QMessageBox, QHBoxLayout
 )
+import os
 import shutil
+
 from datetime import datetime
 
 from admin.usuarios import UsuariosTab
@@ -9,22 +12,15 @@ from admin.predios import PrediosTab
 from admin.anexos import AnexosTab
 from admin.salas import SalasTab
 
-DB_NAME = "C:/Controle_Chaves/controle_chaves.db"
-LOG_FILE = "controle_chaves.log"
-
-
-def log_acao(mensagem):
-    datahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{datahora}] {mensagem}\n")
+from database_module import DB_NAME  # se você expor o caminho lá
+from utils.utils_log import log_acao, LOG_FILE
 
 
 class AdminTab(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
+        self.layout = QVBoxLayout(self)
 
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
@@ -48,7 +44,6 @@ class AdminTab(QWidget):
 
         self.layout.addLayout(btns_layout)
 
-        # estilos dos botões (mesmo padrão geral)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -58,8 +53,6 @@ class AdminTab(QWidget):
                 border: 1px solid #888;
                 font-weight: 500;
             }
-
-            /* Backup em verde */
             QPushButton#btnBackupDb {
                 background-color: #2e7d32;
                 color: white;
@@ -71,8 +64,6 @@ class AdminTab(QWidget):
             QPushButton#btnBackupDb:pressed {
                 background-color: #1b5e20;
             }
-
-            /* Restore em azul (ação crítica/atenção) */
             QPushButton#btnRestoreDb {
                 background-color: #c62828;
                 color: white;
@@ -107,7 +98,8 @@ class AdminTab(QWidget):
             reply = QMessageBox.question(
                 self,
                 "Confirmação",
-                "Atenção! Restaurar o backup irá substituir seu banco atual e pode causar perda de dados recentes.\nTem certeza?",
+                "Atenção! Restaurar o backup irá substituir seu banco atual "
+                "e pode causar perda de dados recentes.\nTem certeza?",
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:

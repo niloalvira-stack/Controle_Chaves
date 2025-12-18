@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QComboBox, QLabel, QHeaderView, QDateEdit
 )
 from PyQt5.QtCore import QDate
+import os
 import sqlite3
 import csv
 from datetime import datetime
@@ -10,8 +11,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from utils import montar_display_sala_variavel, show_info, show_warning
+from database_module import DB_NAME
 
-DB_NAME = "controle_chaves.db"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
 
 
 def formatar_data_br(data_str):
@@ -86,7 +89,7 @@ class RelatorioPorSalaTab(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
+        self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
 
@@ -94,7 +97,6 @@ class RelatorioPorSalaTab(QWidget):
         self.load_chaves()
         self.table.setRowCount(0)  # começa vazio
 
-        # estilos dos botões (mesmo padrão das outras abas)
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -147,6 +149,24 @@ class RelatorioPorSalaTab(QWidget):
         fim = self.data_fim.date().toString("yyyy-MM-dd") + " 23:59:59"
         return ini, fim
 
+    def _query_base(self):
+        """
+        Query base por sala + período, com JOIN utilizadores e compatibilidade com dados antigos.
+        """
+        return """
+            SELECT m.chave,
+                   COALESCE(u.nome, m.usuario) AS utilizador,
+                   m.status,
+                   m.data_retirada,
+                   m.data_retorno
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            WHERE m.chave = ?
+              AND m.data_retirada >= ?
+              AND m.data_retirada <= ?
+            ORDER BY m.data_retirada DESC
+        """
+
     def load_chaves(self):
         self.cb_chave.clear()
         lista = listar_salas_para_relatorio()
@@ -161,14 +181,7 @@ class RelatorioPorSalaTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE chave = ?
-                  AND data_retirada >= ?
-                  AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (chave, data_ini, data_fim))
+            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
             rows = cursor.fetchall()
             conn.close()
 
@@ -178,10 +191,10 @@ class RelatorioPorSalaTab(QWidget):
                 return
 
             self.table.setRowCount(len(rows))
-            for i, (ch, usuario, status, data_ret, data_dev) in enumerate(rows):
+            for i, (ch, utilizador, status, data_ret, data_dev) in enumerate(rows):
                 valores = [
                     ch or "",
-                    usuario or "",
+                    utilizador or "",
                     status or "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_dev),
@@ -202,14 +215,7 @@ class RelatorioPorSalaTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE chave = ?
-                  AND data_retirada >= ?
-                  AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (chave, data_ini, data_fim))
+            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
             rows = cursor.fetchall()
             conn.close()
 
@@ -219,11 +225,11 @@ class RelatorioPorSalaTab(QWidget):
 
             with open(path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Chave", "Usuário", "Status", "Retirada", "Devolução"])
-                for ch, usuario, status, data_ret, data_dev in rows:
+                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
+                for ch, utilizador, status, data_ret, data_dev in rows:
                     writer.writerow([
                         ch or "",
-                        usuario or "",
+                        utilizador or "",
                         status or "",
                         formatar_data_br(data_ret),
                         formatar_data_br(data_dev),
@@ -243,14 +249,7 @@ class RelatorioPorSalaTab(QWidget):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT chave, usuario, status, data_retirada, data_retorno
-                FROM movimentacoes
-                WHERE chave = ?
-                  AND data_retirada >= ?
-                  AND data_retirada <= ?
-                ORDER BY data_retirada DESC
-            """, (chave, data_ini, data_fim))
+            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
             rows = cursor.fetchall()
             conn.close()
 
@@ -258,12 +257,12 @@ class RelatorioPorSalaTab(QWidget):
                 show_info("Exportação", "Nenhuma movimentação encontrada para esta sala e período.")
                 return
 
-            cabecalho = ["Chave", "Usuário", "Status", "Retirada", "Devolução"]
+            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             dados = [cabecalho]
-            for ch, usuario, status, data_ret, data_dev in rows:
+            for ch, utilizador, status, data_ret, data_dev in rows:
                 dados.append([
                     ch or "",
-                    usuario or "",
+                    utilizador or "",
                     status or "",
                     formatar_data_br(data_ret),
                     formatar_data_br(data_dev),

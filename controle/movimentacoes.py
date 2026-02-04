@@ -3,7 +3,6 @@ import os
 import csv
 import sqlite3
 from datetime import datetime
-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialog, QFormLayout, QLineEdit, QComboBox, QHeaderView,
@@ -11,14 +10,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QDate, QTimer
 from PyQt5.QtGui import QBrush, QColor
-
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-
 from utils.validacao import email_valido
 from utils.utils import montar_display_sala_por_id
 from utils.utils_log import log_acao
 from .selecionar_sala_dialog import SelecionarSalaDialog
+from autenticacao.helpers_autenticacao import get_current_user
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
@@ -77,9 +75,6 @@ class FiltroMovimentacaoDialog(QDialog):
 
 
 def criar_tabela_utilizadores():
-    """
-    Cria/ajusta a tabela utilizadores para ter coluna 'ativo' com default 1.
-    """
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
@@ -99,10 +94,6 @@ def criar_tabela_utilizadores():
 
 
 def criar_tabela_movimentacoes():
-    """
-    Cria/ajusta movimentacoes, mantendo usuario/email para compatibilidade
-    e adicionando utilizador_id para o modelo novo.
-    """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -262,14 +253,20 @@ class MovimentacoesTab(QWidget):
             self.carregar_movimentacoes()
             print("Movimentações carregadas")
         except Exception as e:
-            log_acao(f"Erro ao inicializar tabela/carregar movimentações: {e}")
+            user = get_current_user()
+            user_login = user["login"] if user else "sistema"
+            log_acao(
+                action="init_movimentacoes",
+                user=user_login,
+                status="error",
+                details=f"Erro ao inicializar tabela/carregar movimentações: {e}",
+            )
             QMessageBox.critical(self, "Erro", f"Falha ao carregar movimentações:\n{e}")
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.carregar_movimentacoes)
         self.timer.start(5000)
 
-    # ===== utilitário para acessar DashMain =====
     def _get_dash_main(self):
         from interface.dash_main import DashMain  # import local, evita ciclo
         janela = self.parentWidget()
@@ -530,20 +527,39 @@ class MovimentacoesTab(QWidget):
         utilizador_id = self.combo_utilizador.currentData()
         email = self.input_email.text().strip().lower()
 
+        user = get_current_user()
+        user_login = user["login"] if user else "desconhecido"
+
         if not sala_id:
             QMessageBox.warning(self, "Erro", "Selecione uma sala para registrar a retirada.")
-            log_acao(f"Tentativa de retirada inválida: sala_id={sala_id}, utilizador_id={utilizador_id}, email='{email}'")
+            log_acao(
+                action="retirada",
+                user=user_login,
+                resource=f"sala_id={sala_id}",
+                status="error",
+                details=f"Sem sala selecionada; utilizador_id={utilizador_id}, email='{email}'",
+            )
             return
 
         if utilizador_id is None:
             QMessageBox.warning(self, "Erro", "Selecione o utilizador.")
-            log_acao(f"Tentativa de retirada com utilizador não selecionado: sala_id={sala_id}, email='{email}'")
+            log_acao(
+                action="retirada",
+                user=user_login,
+                resource=f"sala_id={sala_id}",
+                status="error",
+                details=f"Utilizador não selecionado; email='{email}'",
+            )
             return
 
         if email and not email_valido(email):
             QMessageBox.warning(self, "Erro", "Informe um e-mail válido.")
             log_acao(
-                f"Tentativa de retirada com e-mail inválido: sala_id={sala_id}, utilizador_id={utilizador_id}, email='{email}'"
+                action="retirada",
+                user=user_login,
+                resource=f"sala_id={sala_id}",
+                status="error",
+                details=f"E-mail inválido; utilizador_id={utilizador_id}, email='{email}'",
             )
             return
 
@@ -551,7 +567,13 @@ class MovimentacoesTab(QWidget):
 
         try:
             registrar_retirada(sala_id, chave_registro, utilizador_id, email)
-            log_acao(f"Retirada registrada: chave='{chave_registro}', utilizador_id={utilizador_id}, email='{email}'")
+            log_acao(
+                action="retirada",
+                user=user_login,
+                resource=chave_registro,
+                status="success",
+                details=f"utilizador_id={utilizador_id}, email='{email}'",
+            )
             QMessageBox.information(
                 self,
                 "Sucesso",
@@ -568,7 +590,11 @@ class MovimentacoesTab(QWidget):
                 dash.show_operation_done("Retirada registrada")
         except Exception as e:
             log_acao(
-                f"Erro ao registrar retirada: chave='{chave_registro}', utilizador_id={utilizador_id}, email='{email}', erro={e}"
+                action="retirada",
+                user=user_login,
+                resource=chave_registro,
+                status="error",
+                details=f"Erro ao registrar retirada: utilizador_id={utilizador_id}, email='{email}', erro={e}",
             )
             QMessageBox.critical(self, "Erro", f"Falha ao registrar retirada:\n{e}")
 
@@ -586,16 +612,29 @@ class MovimentacoesTab(QWidget):
 
     def devolver_selecionada(self):
         selected = self.table.selectedItems()
+        user = get_current_user()
+        user_login = user["login"] if user else "desconhecido"
+
         if not selected:
             QMessageBox.warning(self, "Atenção", "Selecione uma movimentação para registrar devolução!")
-            log_acao("Tentativa de devolução sem seleção na tabela")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                status="error",
+                details="Tentativa de devolução sem seleção na tabela",
+            )
             return
 
         row = selected[0].row()
         item_id = self.table.item(row, 0)
         if not item_id or not item_id.text().strip().isdigit():
             QMessageBox.warning(self, "Erro", "Registro selecionado não possui ID válido.")
-            log_acao("Tentativa de devolução em linha sem ID válido")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                status="error",
+                details="Tentativa de devolução em linha sem ID válido",
+            )
             return
 
         mov_id = int(item_id.text().strip())
@@ -604,26 +643,50 @@ class MovimentacoesTab(QWidget):
 
         if status == "disponível":
             QMessageBox.information(self, "Info", "Esta movimentação já está devolvida!")
-            log_acao(f"Tentativa de devolução já devolvida: mov_id={mov_id}, chave='{chave_nome}'")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                resource=chave_nome,
+                status="warning",
+                details=f"Tentativa de devolução já devolvida; mov_id={mov_id}",
+            )
             return
 
         sala_id = self._obter_sala_id_por_display(chave_nome)
         if sala_id is None:
             QMessageBox.critical(self, "Erro", "Não foi possível localizar a sala desta movimentação.")
-            log_acao(f"Erro ao localizar sala para devolução: mov_id={mov_id}, chave='{chave_nome}'")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                resource=chave_nome,
+                status="error",
+                details=f"Erro ao localizar sala para devolução; mov_id={mov_id}",
+            )
             return
 
         try:
             registrar_devolucao(mov_id, chave_nome, sala_id)
-            log_acao(f"Devolução registrada: mov_id={mov_id}, chave='{chave_nome}'")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                resource=chave_nome,
+                status="success",
+                details=f"mov_id={mov_id}",
+            )
             QMessageBox.information(self, "Sucesso", "Devolução registrada!")
             self.carregar_movimentacoes()
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Devolução registrado")  # texto que desejar
+                dash.show_operation_done("Devolução registrada")
         except Exception as e:
-            log_acao(f"Erro ao registrar devolução: mov_id={mov_id}, chave='{chave_nome}', erro={e}")
+            log_acao(
+                action="devolucao",
+                user=user_login,
+                resource=chave_nome,
+                status="error",
+                details=f"Erro ao registrar devolução: mov_id={mov_id}, erro={e}",
+            )
             QMessageBox.critical(self, "Erro", f"Falha ao registrar devolução:\n{e}")
 
     def obter_dados_da_tabela(self):
@@ -685,10 +748,6 @@ class MovimentacoesTab(QWidget):
 
 
 def verificar_pendencias_e_enviar_emails():
-    """
-    Verifica chaves indisponíveis acima do limite (>= ALERTA_HORAS)
-    sem enviar e-mail; apenas registra no log e retorna a quantidade.
-    """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -711,14 +770,22 @@ def verificar_pendencias_e_enviar_emails():
             retirada_dt = datetime.strptime(data_retirada, "%Y-%m-%d %H:%M:%S")
             diff_horas = (now - retirada_dt).total_seconds() / 3600
         except Exception as e:
-            log_acao(f"Erro ao parsear data_retirada mov_id={mov_id}: {e}")
+            log_acao(
+                action="verificar_pendencias",
+                user="sistema",
+                resource=chave,
+                status="error",
+                details=f"Erro ao parsear data_retirada mov_id={mov_id}: {e}",
+            )
             continue
 
         if diff_horas >= ALERTA_HORAS:
             log_acao(
-                f"Pendência detectada (SEM envio de e-mail): "
-                f"mov_id={mov_id}, chave='{chave}', usuario='{usuario}', "
-                f"email='{email}', atraso={diff_horas:.2f}h"
+                action="verificar_pendencias",
+                user="sistema",
+                resource=chave,
+                status="warning",
+                details=f"Pendência detectada; mov_id={mov_id}, usuario='{usuario}', email='{email}', atraso={diff_horas:.2f}h",
             )
             pendencias_encontradas += 1
 

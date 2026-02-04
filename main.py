@@ -56,16 +56,13 @@ class MainApp:
         Chamado pelo DashMain quando o usuário clica em Logout.
         Limpa a sessão, fecha o painel e volta para a tela de login.
         """
-        session_manager.logout()  # ajuste se tiver outra função de logout
+        session_manager.logout()
 
         if self.dash_main:
             self.dash_main.close()
             self.dash_main = None
 
-        self.show_login()
-
-        self.dash_main = DashMain(on_logout=self.handle_logout)
-        # sem showMaximized() / showFullScreen aqui
+        self.show_login()  # e nada mais aqui
 
 
 if __name__ == "__main__":

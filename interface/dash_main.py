@@ -84,7 +84,7 @@ class DashMain(QMainWindow):
         self.logo_label = QLabel()
         pix = QPixmap(APP_LOGO_PATH)
         if not pix.isNull():
-            pix = pix.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pix = pix.scaled(260,260, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.logo_label.setPixmap(pix)
         self.logo_label.setAlignment(Qt.AlignCenter)
         top_bar.addWidget(self.logo_label)
@@ -97,18 +97,8 @@ class DashMain(QMainWindow):
         # Abas logo abaixo do topo
         layout_principal.addWidget(self.tabs)
 
-        # ===== Barra inferior: progress bar + infos + botões =====
+        # ===== Barra inferior: infos + botões =====
         bottom_bar = QHBoxLayout()
-
-        # Progress bar no canto esquerdo
-        self.progress = QProgressBar()
-       # self.progress.setMinimum(0)
-        #self.progress.setMaximum(100)
-        self.progress.setValue(0)
-        self.progress.setTextVisible(True)
-        self.progress.setFormat("Pronto")
-        #self.progress.setFixedWidth(220)
-        bottom_bar.addWidget(self.progress)
 
         bottom_bar.addStretch()
 
@@ -246,16 +236,6 @@ class DashMain(QMainWindow):
 
         print("Saindo de load_tabs()")
 
-    # ===== Barra de progresso (usada pelas abas) =====
-    def show_operation_done(self, mensagem="Operação concluída"):
-        """Mostra 'Operação concluída' na barra e reseta após alguns segundos."""
-        self.progress.setValue(100)
-        self.progress.setFormat(mensagem)
-
-        QTimer.singleShot(3000, lambda: (
-            self.progress.setValue(0),
-            self.progress.setFormat("Pronto")
-        ))
 
     # ===== Sobre / Logout / Sair =====
     def mostrar_sobre(self):

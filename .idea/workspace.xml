@@ -5,40 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="Backup do sistema Controle de Chaves">
-      <change afterPath="$PROJECT_DIR$/admin/utilizadores_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/relatorios/relatorios_tab.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/validacao.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/admin/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/anexos.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/anexos.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/log_viewer_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/log_viewer_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/predios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/predios.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/salas.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/salas.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/usuarios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/usuarios.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/login_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/login_window.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controle/movimentacoes.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/movimentacoes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/database_init.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_init.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/database_module.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_module.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/estrutura_projeto.txt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorios.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_geral.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_graficos.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_graficos.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_log.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/utils_log.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils_log.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -58,6 +29,12 @@
       <list>
         <option value="Nilo Cesar Ferreira Alvira &lt;nilo.alvira@alvorada.ifrs.edu.br&gt;" />
       </list>
+    </option>
+    <option name="PUSH_TAGS">
+      <GitPushTagMode>
+        <option name="argument" value="--tags" />
+        <option name="title" value="All" />
+      </GitPushTagMode>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="SWAP_SIDES_IN_COMPARE_BRANCHES" value="true" />
@@ -183,7 +160,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765192108455</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Backup do sistema Controle de Chaves">
+      <option name="closed" value="true" />
+      <created>1766062416888</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1766062416888</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

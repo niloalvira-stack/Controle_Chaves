@@ -13,7 +13,8 @@ from admin.anexos import AnexosTab
 from admin.salas import SalasTab
 
 from database_module import DB_NAME  # se você expor o caminho lá
-from utils.utils_log import log_acao, LOG_FILE
+from utils.utils_log import log_acao, LOG_PATH
+
 
 
 class AdminTab(QWidget):

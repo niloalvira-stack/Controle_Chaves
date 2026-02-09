@@ -574,20 +574,18 @@ class MovimentacoesTab(QWidget):
                 status="success",
                 details=f"utilizador_id={utilizador_id}, email='{email}'",
             )
-            QMessageBox.information(
-                self,
-                "Sucesso",
-                f"Retirada registrada para a chave '{chave_registro}'!"
-            )
+
+            # limpa UI e recarrega tabela
             self.sala_id_atual = None
             self.label_sala_selecionada.clear()
             self.combo_utilizador.setCurrentIndex(0)
             self.input_email.clear()
             self.carregar_movimentacoes()
 
+            # APENAS um popup centralizado no DashMain
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Retirada registrada")
+                dash.show_operation_done(f"Retirada registrada para a chave '{chave_registro}'!")
         except Exception as e:
             log_acao(
                 action="retirada",
@@ -673,12 +671,14 @@ class MovimentacoesTab(QWidget):
                 status="success",
                 details=f"mov_id={mov_id}",
             )
-            QMessageBox.information(self, "Sucesso", "Devolução registrada!")
+
+            # atualiza tabela
             self.carregar_movimentacoes()
 
+            # APENAS um popup via DashMain
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Devolução registrada")
+                dash.show_operation_done("Devolução registrada!")
         except Exception as e:
             log_acao(
                 action="devolucao",

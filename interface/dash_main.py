@@ -257,3 +257,10 @@ class DashMain(QMainWindow):
 
     def sair(self):
         QApplication.instance().quit()
+
+    def show_operation_done(self, message="Operação concluída com sucesso."):
+        """
+        Exibe uma mensagem padrão de sucesso de operação.
+        Chamado pelas abas (MovimentacoesTab, etc.).
+        """
+        QMessageBox.information(self, "Sucesso", message)

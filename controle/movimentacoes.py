@@ -462,10 +462,10 @@ class MovimentacoesTab(QWidget):
                         self.combo_utilizador.setCurrentIndex(idx)
                         break
 
-                QMessageBox.information(self, "Utilizador", "Utilizador cadastrado com sucesso!")
                 dash = self._get_dash_main()
                 if dash is not None:
                     dash.show_operation_done("Utilizador cadastrado")
+
             except Exception as e:
                 QMessageBox.critical(self, "Erro", f"Erro ao cadastrar utilizador:\n{e}")
 
@@ -713,7 +713,7 @@ class MovimentacoesTab(QWidget):
                     row[4] = formatar_data_br(row[4])
                     row[5] = formatar_data_br(row[5])
                     writer.writerow(row)
-            QMessageBox.information(self, "Exportação", "Movimentações exportadas para CSV com sucesso!")
+
             dash = self._get_dash_main()
             if dash is not None:
                 dash.show_operation_done("Exportação CSV concluída")
@@ -741,7 +741,7 @@ class MovimentacoesTab(QWidget):
                     c.showPage()
                     y = height - 50
             c.save()
-            QMessageBox.information(self, "Exportação", "Movimentações exportadas para PDF com sucesso!")
+
             dash = self._get_dash_main()
             if dash is not None:
                 dash.show_operation_done("Exportação PDF concluída")

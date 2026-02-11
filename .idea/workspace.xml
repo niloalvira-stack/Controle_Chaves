@@ -181,7 +181,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770226264519</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Backup do sistema Controle de Chaves">
+      <option name="closed" value="true" />
+      <created>1770653671547</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1770653671547</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

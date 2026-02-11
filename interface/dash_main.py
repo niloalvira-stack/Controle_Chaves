@@ -1,4 +1,3 @@
-# interface/dash_main.py
 from datetime import datetime
 
 from PyQt5.QtWidgets import (
@@ -11,7 +10,6 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QLabel,
     QApplication,
-    QProgressBar,
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
@@ -84,7 +82,7 @@ class DashMain(QMainWindow):
         self.logo_label = QLabel()
         pix = QPixmap(APP_LOGO_PATH)
         if not pix.isNull():
-            pix = pix.scaled(260,260, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pix = pix.scaled(260, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.logo_label.setPixmap(pix)
         self.logo_label.setAlignment(Qt.AlignCenter)
         top_bar.addWidget(self.logo_label)
@@ -104,6 +102,21 @@ class DashMain(QMainWindow):
 
         self.label_usuario = QLabel()
         self.label_hora = QLabel()
+
+        # Label de feedback abaixo da barra inferior
+        self.feedback_label = QLabel("")
+        self.feedback_label.setAlignment(Qt.AlignCenter)
+        self.feedback_label.setStyleSheet("""
+            QLabel {
+                background-color: #4caf50;
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+        """)
+        self.feedback_label.hide()
+        layout_principal.addWidget(self.feedback_label)
+
 
         bottom_bar.addWidget(self.label_usuario)
         bottom_bar.addSpacing(20)
@@ -149,6 +162,10 @@ class DashMain(QMainWindow):
                 background-color: #f57f17;
             }
         """)
+
+        # Status bar para mensagens automáticas
+        self.status = self.statusBar()
+        self.status.showMessage("Pronto")
 
         # Infos iniciais (parte inferior)
         self.atualizar_informacoes_usuario()
@@ -236,7 +253,6 @@ class DashMain(QMainWindow):
 
         print("Saindo de load_tabs()")
 
-
     # ===== Sobre / Logout / Sair =====
     def mostrar_sobre(self):
         QMessageBox.information(
@@ -259,8 +275,8 @@ class DashMain(QMainWindow):
         QApplication.instance().quit()
 
     def show_operation_done(self, message="Operação concluída com sucesso."):
-        """
-        Exibe uma mensagem padrão de sucesso de operação.
-        Chamado pelas abas (MovimentacoesTab, etc.).
-        """
-        QMessageBox.information(self, "Sucesso", message)
+        self.feedback_label.setText(message)
+        self.feedback_label.show()
+
+        # some sozinho após 4 segundos
+        QTimer.singleShot(4000, self.feedback_label.hide)

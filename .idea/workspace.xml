@@ -6,20 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="Backup do sistema Controle de Chaves">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/anexos.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/anexos.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/log_viewer_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/log_viewer_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/predios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/predios.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/salas.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/salas.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/usuarios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/usuarios.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/utilizadores_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/utilizadores_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_geral.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_geral.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -209,7 +197,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770817815744</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Backup do sistema Controle de Chaves">
+      <option name="closed" value="true" />
+      <created>1770997719105</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1770997719105</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

@@ -182,6 +182,7 @@ class DashMain(QMainWindow):
     # ===== Atualizações de usuário / hora inferior =====
     def atualizar_informacoes_usuario(self):
         user = get_current_user()
+        print("DEBUG user dict:", user)
         if user:
             nome = (
                     user.get("nome_real")

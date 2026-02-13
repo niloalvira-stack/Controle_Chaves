@@ -104,10 +104,8 @@ class UtilizadoresTab(QWidget):
         Sobe na hierarquia de parents até encontrar a janela principal (DashMain),
         para poder chamar show_operation_done.
         """
-        from interface.dash_main import DashMain  # import local para evitar ciclos
-
         janela = self.parentWidget()
-        while janela is not None and not isinstance(janela, DashMain):
+        while janela is not None and janela.__class__.__name__ != "DashMain":
             janela = janela.parentWidget()
         return janela
 
@@ -138,10 +136,9 @@ class UtilizadoresTab(QWidget):
                         linha.append(item.text() if item else "")
                     writer.writerow(linha)
 
-            QMessageBox.information(self, "Exportação", "Exportação concluída!")
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação concluída")
+                dash.show_operation_done("Exportação de utilizadores concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
 
@@ -189,11 +186,7 @@ class UtilizadoresTab(QWidget):
                         (dados["nome"], dados["email"]),
                     )
                     conn.commit()
-                QMessageBox.information(
-                    self,
-                    "Sucesso",
-                    "Utilizador criado com sucesso."
-                )
+
                 self.load_utilizadores()
                 self._atualizar_combo_movimentacoes()
 
@@ -227,11 +220,6 @@ class UtilizadoresTab(QWidget):
             conn.commit()
 
         self.load_utilizadores()
-        QMessageBox.information(
-            self,
-            "Status",
-            "Utilizador ativado." if novo_status else "Utilizador desativado.",
-        )
         self._atualizar_combo_movimentacoes()
 
         dash = self._get_dash_main()
@@ -310,13 +298,9 @@ class UtilizadoresTab(QWidget):
             with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
                 cur.execute("DELETE FROM utilizadores WHERE id = ?", (util_id,))
                 conn.commit()
+
             self.load_utilizadores()
             self._atualizar_combo_movimentacoes()
-            QMessageBox.information(
-                self,
-                "Excluir Utilizador",
-                "Utilizador excluído com sucesso!"
-            )
 
             dash = self._get_dash_main()
             if dash is not None:

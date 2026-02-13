@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (
 )
 from autenticacao import is_admin, hash_password
 
-
 # Caminho do banco relativo à raiz do projeto
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
@@ -101,6 +100,12 @@ class UsuariosTab(QWidget):
 
         self.load_users()
 
+    def _get_dash_main(self):
+        janela = self.parentWidget()
+        while janela is not None and janela.__class__.__name__ != "DashMain":
+            janela = janela.parentWidget()
+        return janela
+
     def load_users(self):
         self.table.setRowCount(0)
         conn = get_db_connection()
@@ -143,7 +148,10 @@ class UsuariosTab(QWidget):
                 conn.commit()
                 conn.close()
                 self.load_users()
-                QMessageBox.information(self, "Adicionar Usuário", "Usuário cadastrado com sucesso!")
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Usuário criado")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
             except Exception as e:
@@ -201,7 +209,10 @@ class UsuariosTab(QWidget):
                 conn.commit()
                 conn.close()
                 self.load_users()
-                QMessageBox.information(self, "Editar Usuário", "Usuário editado com sucesso!")
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Usuário editado")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
             except Exception as e:
@@ -233,7 +244,10 @@ class UsuariosTab(QWidget):
             conn.commit()
             conn.close()
             self.load_users()
-            QMessageBox.information(self, "Excluído", f"Usuário '{nome}' excluído!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Usuário excluído")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao excluir usuário: {e}")
 
@@ -251,6 +265,9 @@ class UsuariosTab(QWidget):
                     admin = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
                     primeiro = self.table.item(row, 4).text() if self.table.item(row, 4) else ""
                     f.write(f"{login};{nome};{admin};{primeiro}\n")
-            QMessageBox.information(self, "Exportação", "Exportação concluída!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação de usuários concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")

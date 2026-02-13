@@ -1,9 +1,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView
+    QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView, QApplication
 )
-from PyQt5.QtCore import QDate
-import os
+from PyQt5.QtCore import QDate, Qt
 import sqlite3
 import csv
 from reportlab.lib.pagesizes import A4
@@ -67,6 +66,8 @@ class RelatorioPorPeriodoTab(QWidget):
             ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -120,6 +121,15 @@ class RelatorioPorPeriodoTab(QWidget):
 
         self.load_relatorio()
 
+    def _get_dash_main(self):
+        app = QApplication.instance()
+        if not app:
+            return None
+        for widget in app.topLevelWidgets():
+            if widget.__class__.__name__ == "DashMain":
+                return widget
+        return None
+
     def _periodo(self):
         inicio = self.data_inicio.date().toString("yyyy-MM-dd") + " 00:00:00"
         fim = self.data_fim.date().toString("yyyy-MM-dd") + " 23:59:59"
@@ -155,14 +165,18 @@ class RelatorioPorPeriodoTab(QWidget):
             for i, row in enumerate(rows):
                 # row: [id, chave, utilizador, status, data_retirada, data_retorno]
                 for j, val in enumerate(row[1:]):
-                    if j in [3, 4]:  # datas nas posições 3 e 4 após o ID
+                    if j in (3, 4):  # datas nas posições 3 e 4 após o ID
                         val = formatar_data_br(val)
-                    self.table.setItem(i, j, QTableWidgetItem(str(val) if val else ""))
+                    item = QTableWidgetItem(str(val) if val else "")
+                    item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, j, item)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
 
     def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar CSV", "", "CSV Files (*.csv)"
+        )
         if not path:
             return
         inicio, fim = self._periodo()
@@ -181,12 +195,17 @@ class RelatorioPorPeriodoTab(QWidget):
                     row[4] = formatar_data_br(row[4])  # retirada
                     row[5] = formatar_data_br(row[5])  # devolução
                     writer.writerow(row[1:])  # ignora ID
-            QMessageBox.information(self, "Sucesso", "Relatório exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação CSV por período concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF Files (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar PDF", "", "PDF Files (*.pdf)"
+        )
         if not path:
             return
         inicio, fim = self._periodo()
@@ -206,7 +225,12 @@ class RelatorioPorPeriodoTab(QWidget):
                 tabela_dados.append([str(x) if x else "" for x in row[1:]])  # ignora ID
 
             pdf = SimpleDocTemplate(
-                path, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+                path,
+                pagesize=A4,
+                leftMargin=24,
+                rightMargin=24,
+                topMargin=24,
+                bottomMargin=24,
             )
             table = Table(tabela_dados, repeatRows=1)
             style = TableStyle([
@@ -221,6 +245,9 @@ class RelatorioPorPeriodoTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            QMessageBox.information(self, "Exportação", "PDF gerado com sucesso! Ocupa toda a página.")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF por período concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")

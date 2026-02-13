@@ -27,6 +27,7 @@ class PredioDialog(QDialog):
             "nome": self.nome_edit.text().strip()
         }
 
+
 class PrediosTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -65,6 +66,12 @@ class PrediosTab(QWidget):
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         self.criar_tabela_predios()
         self.load_predios()
+
+    def _get_dash_main(self):
+        janela = self.parentWidget()
+        while janela is not None and janela.__class__.__name__ != "DashMain":
+            janela = janela.parentWidget()
+        return janela
 
     def criar_tabela_predios(self):
         conn = sqlite3.connect(DB_NAME)
@@ -108,8 +115,11 @@ class PrediosTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Prédio cadastrado com sucesso!")
                 self.load_predios()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Prédio cadastrado")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Aviso", "Já existe um prédio com este nome!")
             except Exception as e:
@@ -138,8 +148,11 @@ class PrediosTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Prédio atualizado com sucesso!")
                 self.load_predios()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Prédio atualizado")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Aviso", "Nome de prédio já existe!")
             except Exception as e:
@@ -167,23 +180,30 @@ class PrediosTab(QWidget):
             cursor.execute("DELETE FROM predios WHERE id=?", (predio_id,))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sucesso", "Prédio excluído!")
             self.load_predios()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Prédio excluído")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao excluir prédio: {e}")
 
     def exportar_csv(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
-        if caminho:
-            try:
-                with open(caminho, "w", encoding="utf-8") as f:
-                    f.write("Nome\n")
-                    for row in range(self.table.rowCount()):
-                        nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
-                        f.write(f"{nome}\n")
-                QMessageBox.information(self, "Exportação", "Exportação concluída!")
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+        if not caminho:
+            return
+        try:
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("Nome\n")
+                for row in range(self.table.rowCount()):
+                    nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                    f.write(f"{nome}\n")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação de prédios concluída.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
 
     def exportar_pdf(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
@@ -214,6 +234,9 @@ class PrediosTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            QMessageBox.information(self, "Exportação PDF", "PDF exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF de prédios concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

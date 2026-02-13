@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QComboBox, QLabel, QHeaderView, QDateEdit
+    QFileDialog, QComboBox, QLabel, QHeaderView, QDateEdit, QApplication
 )
-from PyQt5.QtCore import QDate
+from PyQt5.QtCore import QDate, Qt
 import os
 import sqlite3
 import csv
@@ -91,6 +91,8 @@ class RelatorioPorSalaTab(QWidget):
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -143,6 +145,15 @@ class RelatorioPorSalaTab(QWidget):
                 background-color: #0d47a1;
             }
         """)
+
+    def _get_dash_main(self):
+        app = QApplication.instance()
+        if not app:
+            return None
+        for widget in app.topLevelWidgets():
+            if widget.__class__.__name__ == "DashMain":
+                return widget
+        return None
 
     def _get_periodo(self):
         ini = self.data_inicio.date().toString("yyyy-MM-dd") + " 00:00:00"
@@ -200,7 +211,9 @@ class RelatorioPorSalaTab(QWidget):
                     formatar_data_br(data_dev),
                 ]
                 for j, val in enumerate(valores):
-                    self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                    item = QTableWidgetItem(str(val))
+                    item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, j, item)
         except Exception as e:
             show_warning("Erro", f"Erro ao carregar relatório:\n{e}")
 
@@ -234,7 +247,10 @@ class RelatorioPorSalaTab(QWidget):
                         formatar_data_br(data_ret),
                         formatar_data_br(data_dev),
                     ])
-            show_info("Sucesso", "Relatório exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação CSV por sala concluída.")
         except Exception as e:
             show_warning("Erro", f"Erro ao exportar CSV:\n{e}")
 
@@ -284,6 +300,9 @@ class RelatorioPorSalaTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            show_info("Exportação", "Relatório PDF exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF por sala concluída.")
         except Exception as e:
             show_warning("Erro", f"Erro ao exportar PDF:\n{e}")

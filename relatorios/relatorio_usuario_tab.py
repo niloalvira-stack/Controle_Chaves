@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QComboBox, QLabel, QHeaderView
+    QFileDialog, QMessageBox, QComboBox, QLabel, QHeaderView, QApplication
 )
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from datetime import datetime
 import os
 import sqlite3
@@ -57,6 +57,8 @@ class RelatorioPorUsuarioTab(QWidget):
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -114,6 +116,15 @@ class RelatorioPorUsuarioTab(QWidget):
             }
         """)
 
+    def _get_dash_main(self):
+        app = QApplication.instance()
+        if not app:
+            return None
+        for widget in app.topLevelWidgets():
+            if widget.__class__.__name__ == "DashMain":
+                return widget
+        return None
+
     def refresh(self):
         usuario_id_atual = self.cb_usuario.currentData()
         self.load_usuarios()
@@ -132,7 +143,6 @@ class RelatorioPorUsuarioTab(QWidget):
 
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        # lista todos os utilizadores que têm alguma movimentação (ou todos, se preferir)
         c.execute("""
             SELECT DISTINCT u.id, u.nome
             FROM utilizadores u
@@ -191,7 +201,9 @@ class RelatorioPorUsuarioTab(QWidget):
                 for j, val in enumerate(row):
                     if j in (3, 4):  # datas
                         val = formatar_data_br(val)
-                    self.table.setItem(i, j, QTableWidgetItem(str(val) if val else ""))
+                    item = QTableWidgetItem(str(val) if val else "")
+                    item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, j, item)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
 
@@ -226,7 +238,10 @@ class RelatorioPorUsuarioTab(QWidget):
                 writer = csv.writer(f)
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 writer.writerows(linhas)
-            QMessageBox.information(self, "Sucesso", "Relatório exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação CSV por utilizador concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
@@ -274,6 +289,9 @@ class RelatorioPorUsuarioTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            QMessageBox.information(self, "Exportação", "Relatório PDF exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF por utilizador concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")

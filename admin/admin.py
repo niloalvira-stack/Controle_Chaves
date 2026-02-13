@@ -16,7 +16,6 @@ from database_module import DB_NAME  # se você expor o caminho lá
 from utils.utils_log import log_acao, LOG_PATH
 
 
-
 class AdminTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -78,36 +77,63 @@ class AdminTab(QWidget):
             }
         """)
 
+    # === helper para acessar o DashMain e usar o feed ===
+    def _get_dash_main(self):
+        janela = self.parentWidget()
+        while janela is not None and janela.__class__.__name__ != "DashMain":
+            janela = janela.parentWidget()
+        return janela
+
     def fazer_backup(self):
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar backup do banco", "", "Arquivo SQLite (*.db)"
         )
-        if caminho:
-            try:
-                shutil.copyfile(DB_NAME, caminho)
-                QMessageBox.information(self, "Backup", "Backup realizado com sucesso!")
-                log_acao(f"Backup realizado: {caminho}")
-            except Exception as e:
-                log_acao(f"Erro ao realizar backup: {e}")
-                QMessageBox.critical(self, "Erro", f"Erro ao realizar backup: {e}")
+        if not caminho:
+            return
+
+        try:
+            shutil.copyfile(DB_NAME, caminho)
+            log_acao(f"Backup realizado: {caminho}")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Backup do banco concluído com sucesso.")
+
+            # Se ainda quiser, pode manter um aviso simples:
+            # QMessageBox.information(self, "Backup", "Backup realizado com sucesso!")
+
+        except Exception as e:
+            log_acao(f"Erro ao realizar backup: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao realizar backup: {e}")
 
     def fazer_restore(self):
         caminho, _ = QFileDialog.getOpenFileName(
             self, "Restaurar banco de backup", "", "Arquivo SQLite (*.db)"
         )
-        if caminho:
-            reply = QMessageBox.question(
-                self,
-                "Confirmação",
-                "Atenção! Restaurar o backup irá substituir seu banco atual "
-                "e pode causar perda de dados recentes.\nTem certeza?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                try:
-                    shutil.copyfile(caminho, DB_NAME)
-                    QMessageBox.information(self, "Restaurar", "Banco restaurado com sucesso!")
-                    log_acao(f"Restore realizado: {caminho} -> {DB_NAME}")
-                except Exception as e:
-                    log_acao(f"Erro ao restaurar banco: {e}")
-                    QMessageBox.critical(self, "Erro", f"Erro ao restaurar banco: {e}")
+        if not caminho:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Confirmação",
+            "Atenção! Restaurar o backup irá substituir seu banco atual "
+            "e pode causar perda de dados recentes.\nTem certeza?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            shutil.copyfile(caminho, DB_NAME)
+            log_acao(f"Restore realizado: {caminho} -> {DB_NAME}")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Banco restaurado com sucesso.")
+
+            # Opcional manter:
+            # QMessageBox.information(self, "Restaurar", "Banco restaurado com sucesso!")
+
+        except Exception as e:
+            log_acao(f"Erro ao restaurar banco: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao restaurar banco: {e}")

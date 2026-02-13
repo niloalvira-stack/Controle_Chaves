@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QHeaderView
+    QFileDialog, QMessageBox, QHeaderView, QApplication
 )
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 import sqlite3
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -10,6 +10,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from datetime import datetime
 from database_module import DB_NAME  # usa DB_NAME central
+
 
 def formatar_data_br(data_str):
     if not data_str:
@@ -40,8 +41,12 @@ class RelatorioPendenciasTab(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
+        self.table.setHorizontalHeaderLabels(
+            ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -89,6 +94,18 @@ class RelatorioPendenciasTab(QWidget):
         self.timer.timeout.connect(self.load_relatorio)
         self.timer.start(5000)
 
+    def _get_dash_main(self):
+        """
+        Recupera a janela principal (DashMain) para usar show_operation_done.
+        """
+        app = QApplication.instance()
+        if not app:
+            return None
+        for widget in app.topLevelWidgets():
+            if widget.__class__.__name__ == "DashMain":
+                return widget
+        return None
+
     def _query_base(self):
         """
         Pendências: status 'indisponível', com JOIN utilizadores.
@@ -125,12 +142,16 @@ class RelatorioPendenciasTab(QWidget):
                     formatar_data_br(data_dev),
                 ]
                 for j, val in enumerate(valores):
-                    self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                    item = QTableWidgetItem(str(val))
+                    item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, j, item)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
 
     def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar CSV", "", "CSV Files (*.csv)"
+        )
         if not path:
             return
         try:
@@ -151,12 +172,17 @@ class RelatorioPendenciasTab(QWidget):
                         formatar_data_br(data_ret),
                         formatar_data_br(data_dev),
                     ])
-            QMessageBox.information(self, "Sucesso", "Relatório exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação CSV de pendências concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF Files (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar PDF", "", "PDF Files (*.pdf)"
+        )
         if not path:
             return
         try:
@@ -178,7 +204,12 @@ class RelatorioPendenciasTab(QWidget):
                 ])
 
             pdf = SimpleDocTemplate(
-                path, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+                path,
+                pagesize=A4,
+                leftMargin=24,
+                rightMargin=24,
+                topMargin=24,
+                bottomMargin=24,
             )
             table = Table(tabela_dados, repeatRows=1)
             style = TableStyle([
@@ -193,6 +224,9 @@ class RelatorioPendenciasTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            QMessageBox.information(self, "Exportação", "PDF gerado com sucesso. Ocupando toda a página!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF de pendências concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")

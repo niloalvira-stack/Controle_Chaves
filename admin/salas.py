@@ -69,9 +69,13 @@ class SalasTab(QWidget):
         self.btn_add = QPushButton("Cadastrar Sala")
         self.btn_edit = QPushButton("Editar Sala")
         self.btn_delete = QPushButton("Excluir Sala")
+        self.btn_exportar = QPushButton("Exportar CSV")
+        self.btn_exportar_pdf = QPushButton("Exportar PDF")
         btn_layout.addWidget(self.btn_add)
         btn_layout.addWidget(self.btn_edit)
         btn_layout.addWidget(self.btn_delete)
+        btn_layout.addWidget(self.btn_exportar)
+        btn_layout.addWidget(self.btn_exportar_pdf)
         layout.addLayout(btn_layout)
 
         self.table = QTableWidget()
@@ -88,9 +92,17 @@ class SalasTab(QWidget):
         self.btn_add.clicked.connect(self.adicionar_sala)
         self.btn_edit.clicked.connect(self.editar_sala)
         self.btn_delete.clicked.connect(self.excluir_sala)
+        self.btn_exportar.clicked.connect(self.exportar_csv)
+        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
 
         self.criar_tabela_salas()
         self.load_salas()
+
+    def _get_dash_main(self):
+        janela = self.parentWidget()
+        while janela is not None and janela.__class__.__name__ != "DashMain":
+            janela = janela.parentWidget()
+        return janela
 
     def criar_tabela_salas(self):
         conn = sqlite3.connect(DB_NAME)
@@ -173,8 +185,11 @@ class SalasTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Sala cadastrada com sucesso!")
                 self.load_salas()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Sala cadastrada")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Aviso", "Já existe uma sala com este nome!")
             except Exception as e:
@@ -213,8 +228,11 @@ class SalasTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Sala atualizada com sucesso!")
                 self.load_salas()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Sala atualizada")
             except sqlite3.IntegrityError:
                 QMessageBox.warning(self, "Aviso", "Já existe uma sala com este nome!")
             except Exception as e:
@@ -244,7 +262,69 @@ class SalasTab(QWidget):
             cursor.execute("DELETE FROM salas WHERE id=?", (sala_id,))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sucesso", "Sala excluída!")
             self.load_salas()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Sala excluída")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao excluir sala: {e}")
+
+    def exportar_csv(self):
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
+        if not caminho:
+            return
+        try:
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("Nome;Prédio;Anexo\n")
+                for row in range(self.table.rowCount()):
+                    nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                    predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+                    anexo = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
+                    f.write(f"{nome};{predio};{anexo}\n")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação de salas concluída.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+
+    def exportar_pdf(self):
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
+        if not caminho:
+            return
+        try:
+            cabecalho = ["Nome", "Prédio", "Anexo"]
+            dados = [cabecalho]
+            for row in range(self.table.rowCount()):
+                nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+                anexo = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
+                dados.append([nome, predio, anexo])
+
+            pdf = SimpleDocTemplate(
+                caminho, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+            )
+            table = Table(dados, repeatRows=1)
+            style = TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ])
+            table.setStyle(style)
+            pdf.build([table])
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF de salas concluída.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

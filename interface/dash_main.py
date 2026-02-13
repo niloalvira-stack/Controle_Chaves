@@ -1,3 +1,5 @@
+from admin.utilizadores_tab import UtilizadoresTab
+
 from datetime import datetime
 
 from PyQt5.QtWidgets import (
@@ -9,14 +11,12 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QMessageBox,
     QLabel,
-    QApplication,
-)
+    QApplication,)
+
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
-
 from admin.admin import AdminTab
 from admin.log_viewer_tab import LogViewerTab
-from admin.utilizadores_tab import UtilizadoresTab
 from autenticacao import session_manager
 from autenticacao.helpers_autenticacao import get_current_user, is_admin
 from config import (
@@ -183,9 +183,14 @@ class DashMain(QMainWindow):
     def atualizar_informacoes_usuario(self):
         user = get_current_user()
         if user:
-            nome = user.get("nome") or user.get("usuario") or "Usuário"
-            perfil = "Admin" if user.get("is_admin") else "Usuário"
-            self.label_usuario.setText(f"Logado como: {nome} ({perfil})")
+            nome = (
+                    user.get("nome_real")
+                    or user.get("nome")
+                    or user.get("usuario")
+                    or "Usuário"
+            )
+            perfil = "Administrador" if user.get("is_admin") else "Usuário comum"
+            self.label_usuario.setText(f"{nome} - {perfil}")
         else:
             self.label_usuario.setText("Nenhum usuário logado")
 

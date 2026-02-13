@@ -41,6 +41,7 @@ class AnexoDialog(QDialog):
             "predio_id": self.combo_predio.currentData()
         }
 
+
 class AnexosTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -48,6 +49,7 @@ class AnexosTab(QWidget):
         layout = QVBoxLayout(self)
         label = QLabel("Gestão de Anexos")
         layout.addWidget(label)
+
         btn_layout = QHBoxLayout()
         self.btn_add = QPushButton("Cadastrar Anexo")
         self.btn_edit = QPushButton("Editar Anexo")
@@ -78,6 +80,12 @@ class AnexosTab(QWidget):
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         self.criar_tabela_anexos()
         self.load_anexos()
+
+    def _get_dash_main(self):
+        janela = self.parentWidget()
+        while janela is not None and janela.__class__.__name__ != "DashMain":
+            janela = janela.parentWidget()
+        return janela
 
     def criar_tabela_anexos(self):
         conn = sqlite3.connect(DB_NAME)
@@ -140,8 +148,11 @@ class AnexosTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Anexo cadastrado com sucesso!")
                 self.load_anexos()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Anexo cadastrado")
             except Exception as e:
                 QMessageBox.critical(self, "Erro", f"Erro ao cadastrar anexo: {e}")
 
@@ -171,8 +182,11 @@ class AnexosTab(QWidget):
                 )
                 conn.commit()
                 conn.close()
-                QMessageBox.information(self, "Sucesso", "Anexo atualizado com sucesso!")
                 self.load_anexos()
+
+                dash = self._get_dash_main()
+                if dash is not None:
+                    dash.show_operation_done("Anexo atualizado")
             except Exception as e:
                 QMessageBox.critical(self, "Erro", f"Erro ao editar anexo: {e}")
 
@@ -198,24 +212,31 @@ class AnexosTab(QWidget):
             cursor.execute("DELETE FROM anexos WHERE id=?", (anexo_id,))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sucesso", "Anexo excluído!")
             self.load_anexos()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Anexo excluído")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao excluir anexo: {e}")
 
     def exportar_csv(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
-        if caminho:
-            try:
-                with open(caminho, "w", encoding="utf-8") as f:
-                    f.write("Nome;Prédio\n")
-                    for row in range(self.table.rowCount()):
-                        nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
-                        predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
-                        f.write(f"{nome};{predio}\n")
-                QMessageBox.information(self, "Exportação", "Exportação concluída!")
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+        if not caminho:
+            return
+        try:
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("Nome;Prédio\n")
+                for row in range(self.table.rowCount()):
+                    nome = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+                    predio = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+                    f.write(f"{nome};{predio}\n")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação de anexos concluída.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
 
     def exportar_pdf(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
@@ -244,6 +265,9 @@ class AnexosTab(QWidget):
             ])
             table.setStyle(style)
             pdf.build([table])
-            QMessageBox.information(self, "Exportação PDF", "PDF exportado com sucesso!")
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Exportação PDF de anexos concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

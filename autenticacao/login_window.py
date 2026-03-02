@@ -1,3 +1,5 @@
+# autenticacao/login_window.py
+
 import traceback
 from PyQt5.QtWidgets import (
     QWidget, QLineEdit, QLabel, QPushButton, QVBoxLayout,
@@ -11,7 +13,7 @@ from .autenticacao import (
 from database_module import execute_query
 from .session import session_manager
 from utils.utils_log import log_acao
-from autenticacao.helpers_autenticacao import validar_login, get_current_user
+from autenticacao import get_current_user
 
 
 class ChangePasswordDialog(QDialog):
@@ -50,8 +52,13 @@ class ChangePasswordDialog(QDialog):
             return
 
         senha_hashed = hash_password(pw)
-        query = "UPDATE usuarios SET senha = ?, primeiro_login = 0 WHERE id = ?"
-        execute_query(query, (senha_hashed, self.user_id))
+
+        # Coluna de senha: ajuste se necessário (senha / senha_hash)
+        query = "UPDATE usuarios SET senha = %s, primeiro_login = %s WHERE id = %s"
+        # Exemplo alternativo:
+        # query = "UPDATE usuarios SET senha_hash = %s, primeiro_login = %s WHERE id = %s"
+
+        execute_query(query, (senha_hashed, False, self.user_id))
         log_acao(f"Senha alterada com sucesso para usuário id={self.user_id}")
         show_info("Sucesso", "Senha alterada com sucesso!")
         self.accept()
@@ -101,6 +108,7 @@ class LoginWindow(QWidget):
             log_acao(f"Tentativa de login com campos vazios (login='{login}')")
             return
 
+        # Busca usuário no Postgres
         user = get_user_by_login(login)
         if not user:
             QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
@@ -108,9 +116,9 @@ class LoginWindow(QWidget):
             return
 
         user = dict(user)
-        senha_banco = user["senha"]
+        senha_banco = user["senha"]  # ou senha_hash, conforme seu schema
 
-        # verifica se senha está em formato seguro (bcrypt, por exemplo)
+        # verifica se senha está em formato seguro (bcrypt)
         hash_valido = senha_banco and senha_banco.startswith("$2b$")
         if not hash_valido:
             log_acao(
@@ -144,6 +152,7 @@ class LoginWindow(QWidget):
                 )
                 return
 
+        # valida senha com bcrypt
         senha_valida = verify_password(senha_banco, senha)
         print(f"Senha válida? {senha_valida}")
 
@@ -182,27 +191,25 @@ class LoginWindow(QWidget):
                     return
 
             # Login normal (não é primeiro login)
-            print("DEBUG: antes de chamar validar_login")
-            if not validar_login(user["login"], senha):
-                print("DEBUG: validar_login retornou False")
+            print("DEBUG: antes de session_manager.login")
+            if not session_manager.login(user["login"]):
+                print("DEBUG: session_manager.login retornou False")
                 QMessageBox.warning(
                     self,
                     "Erro",
                     "Falha ao carregar sessão do usuário."
                 )
                 log_acao(
-                    f"Falha ao validar_login no helper para usuário '{login}'"
+                    f"Falha ao carregar sessão para usuário '{login}'"
                 )
                 return
 
-            print("DEBUG: antes de session_manager.login")
-            session_manager.login(user["login"])
             QMessageBox.information(self, "Sucesso", "Login realizado com sucesso.")
             log_acao(f"Login bem-sucedido para usuário '{login}'")
 
             print("DEBUG: antes de on_login_success")
             user_atual = get_current_user()
-            print("DEBUG user_atual após validar_login:", user_atual)
+            print("DEBUG user_atual após login:", user_atual)
             self.on_login_success(user_atual)
             print("DEBUG: depois de on_login_success (antes de close)")
             self.close()

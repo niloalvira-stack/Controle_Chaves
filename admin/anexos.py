@@ -1,5 +1,3 @@
-import os
-import sqlite3
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QDialog, QFormLayout, QLineEdit, QComboBox, QMessageBox, QFileDialog, QHeaderView,
@@ -9,27 +7,38 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 
-# Caminho correto para o banco, relativo ao projeto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from database_module import get_connection  # psycopg2 com RealDictCursor
 
 
 class AnexoDialog(QDialog):
     def __init__(self, predios, nome="", predio_id=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Cadastro/Editar Anexo")
+
         layout = QFormLayout(self)
+
         self.nome_edit = QLineEdit(nome)
+
         self.combo_predio = QComboBox()
+        self.combo_predio.clear()
         self.combo_predio.addItem("Nenhum", None)
-        for pid, pname in predios:
-            self.combo_predio.addItem(pname, pid)
-        if predio_id:
+
+        # predios é lista de RealDictRow
+        print("DEBUG AnexoDialog predios recebidos:", predios)
+        for row in predios:
+            pid = row["id"]
+            pname = row["nome"]
+            self.combo_predio.addItem(str(pname), pid)
+
+        # selecionar prédio atual (na edição)
+        if predio_id is not None:
             idx = self.combo_predio.findData(predio_id)
             if idx >= 0:
                 self.combo_predio.setCurrentIndex(idx)
+
         layout.addRow("Nome do anexo:", self.nome_edit)
         layout.addRow("Prédio:", self.combo_predio)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -78,7 +87,7 @@ class AnexosTab(QWidget):
         self.btn_delete.clicked.connect(self.excluir_anexo)
         self.btn_exportar.clicked.connect(self.exportar_csv)
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
-        self.criar_tabela_anexos()
+
         self.load_anexos()
 
     def _get_dash_main(self):
@@ -87,76 +96,92 @@ class AnexosTab(QWidget):
             janela = janela.parentWidget()
         return janela
 
-    def criar_tabela_anexos(self):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS anexos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                predio_id INTEGER,
-                FOREIGN KEY (predio_id) REFERENCES predios(id)
-            )
-        """)
-        conn.commit()
-        conn.close()
-
     def fetch_predios(self):
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = get_connection()
+            if conn is None:
+                print("DEBUG fetch_predios: conn is None")
+                return []
             cursor = conn.cursor()
             cursor.execute("SELECT id, nome FROM predios ORDER BY nome")
             predios = cursor.fetchall()
+            print("DEBUG fetch_predios rows:", predios)
             conn.close()
             return predios
-        except:
+        except Exception as e:
+            print("DEBUG fetch_predios ERRO:", e)
             return []
 
     def load_anexos(self):
         self.table.setRowCount(0)
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = get_connection()
+            if conn is None:
+                return
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT a.id, a.nome, p.nome
-                FROM anexos a LEFT JOIN predios p ON a.predio_id = p.id
+                SELECT a.id,
+                       a.nome AS anexo_nome,
+                       p.nome AS predio_nome
+                FROM anexos a
+                LEFT JOIN predios p ON a.predio_id = p.id
                 ORDER BY a.nome
             """)
-            for row_idx, (anexo_id, nome, predio_nome) in enumerate(cursor.fetchall()):
-                self.table.insertRow(row_idx)
+            rows = cursor.fetchall()
+            print("DEBUG anexos em AnexosTab:", rows)
+
+            self.table.setRowCount(len(rows))
+
+            for row_idx, row in enumerate(rows):
+                anexo_id = row["id"]
+                anexo_nome = row["anexo_nome"]
+                predio_nome = row["predio_nome"]
+
                 self.table.setItem(row_idx, 0, QTableWidgetItem(str(anexo_id)))
-                self.table.setItem(row_idx, 1, QTableWidgetItem(str(nome)))
-                self.table.setItem(row_idx, 2, QTableWidgetItem(str(predio_nome if predio_nome else "")))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(str(anexo_nome)))
+                self.table.setItem(
+                    row_idx, 2,
+                    QTableWidgetItem(str(predio_nome if predio_nome else ""))
+                )
+
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar anexos: {e}")
 
     def cadastrar_anexo(self):
         predios = self.fetch_predios()
-        dialog = AnexoDialog(predios)
-        if dialog.exec():
-            data = dialog.get_data()
-            if not data["nome"]:
-                QMessageBox.warning(self, "Erro", "Nome do anexo é obrigatório.")
-                return
-            try:
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO anexos (nome, predio_id) VALUES (?, ?)",
-                    (data["nome"], data["predio_id"])
-                )
-                conn.commit()
-                conn.close()
-                self.load_anexos()
+        print("DEBUG cadastrar_anexo predios:", predios)
+        dialog = AnexoDialog(predios, nome="", predio_id=None, parent=self)
+        if not dialog.exec():
+            return
 
-                dash = self._get_dash_main()
-                if dash is not None:
-                    dash.show_operation_done("Anexo cadastrado")
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao cadastrar anexo: {e}")
+        data = dialog.get_data()
+        print("DEBUG dados retornados do dialog cadastrar:", data)
+        if not data["nome"]:
+            QMessageBox.warning(self, "Erro", "Nome do anexo é obrigatório.")
+            return
+
+        try:
+            conn = get_connection()
+            if conn is None:
+                return
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO anexos (nome, predio_id) VALUES (%s, %s)",
+                (data["nome"], data["predio_id"])
+            )
+            conn.commit()
+            conn.close()
+            self.load_anexos()
+
+            dash = self._get_dash_main()
+            if dash is not None:
+                dash.show_operation_done("Anexo cadastrado")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao cadastrar anexo: {e}")
 
     def editar_anexo(self):
+        print("DEBUG: clicar Editar Anexo")
         selected = self.table.selectedItems()
         if not selected:
             QMessageBox.warning(self, "Aviso", "Selecione um anexo para editar!")
@@ -165,19 +190,27 @@ class AnexosTab(QWidget):
         anexo_id = int(self.table.item(row, 0).text())
         nome = self.table.item(row, 1).text()
         predio_nome = self.table.item(row, 2).text()
+        print("DEBUG: linha selecionada:", row, anexo_id, nome, predio_nome)
+
         predios = self.fetch_predios()
-        predio_id = next((pid for pid, pname in predios if pname == predio_nome), None)
-        dialog = AnexoDialog(predios, nome, predio_id)
+        print("DEBUG: predios em editar_anexo:", predios)
+        predio_id = next((p["id"] for p in predios if p["nome"] == predio_nome), None)
+        print("DEBUG: predio_id resolvido:", predio_id)
+
+        dialog = AnexoDialog(predios, nome, predio_id, parent=self)
         if dialog.exec():
             data = dialog.get_data()
+            print("DEBUG dados retornados do dialog editar:", data)
             if not data["nome"]:
                 QMessageBox.warning(self, "Erro", "Nome do anexo é obrigatório.")
                 return
             try:
-                conn = sqlite3.connect(DB_NAME)
+                conn = get_connection()
+                if conn is None:
+                    return
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE anexos SET nome=?, predio_id=? WHERE id=?",
+                    "UPDATE anexos SET nome = %s, predio_id = %s WHERE id = %s",
                     (data["nome"], data["predio_id"], anexo_id)
                 )
                 conn.commit()
@@ -207,9 +240,11 @@ class AnexosTab(QWidget):
         if reply != QMessageBox.Yes:
             return
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = get_connection()
+            if conn is None:
+                return
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM anexos WHERE id=?", (anexo_id,))
+            cursor.execute("DELETE FROM anexos WHERE id = %s", (anexo_id,))
             conn.commit()
             conn.close()
             self.load_anexos()
@@ -254,14 +289,14 @@ class AnexosTab(QWidget):
             )
             table = Table(dados, repeatRows=1)
             style = TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("FONTSIZE", (0,0), (-1,-1), 9),
-                ("ALIGN", (0,0), (-1,-1), "CENTER"),
-                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-                ("TOPPADDING", (0,0), (-1,-1), 2),
-                ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ])
             table.setStyle(style)
             pdf.build([table])
@@ -271,3 +306,4 @@ class AnexosTab(QWidget):
                 dash.show_operation_done("Exportação PDF de anexos concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")
+

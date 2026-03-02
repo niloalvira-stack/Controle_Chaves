@@ -1,10 +1,5 @@
-import os
-import sqlite3
 from PyQt5.QtWidgets import QMessageBox
-
-# Caminho correto para o banco, relativo ao projeto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def montar_display_sala_variavel(nome, predio, anexo=None):
@@ -17,13 +12,13 @@ def montar_display_sala_variavel(nome, predio, anexo=None):
 
 
 def montar_display_sala_por_id(sala_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT s.nome, p.nome
         FROM salas s
         LEFT JOIN predios p ON s.predio_id = p.id
-        WHERE s.id = ?
+        WHERE s.id = %s
     """, (sala_id,))
     row = cursor.fetchone()
     conn.close()

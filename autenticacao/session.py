@@ -1,3 +1,5 @@
+# autenticacao/session.py
+
 import time
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
@@ -34,7 +36,7 @@ class SessionManager:
             sql = """
                 SELECT id, login, nome, is_admin
                 FROM usuarios
-                WHERE login = ?
+                WHERE login = %s
             """
             row = execute_query(sql, (login,), fetchone=True)
         except Exception as e:
@@ -45,9 +47,9 @@ class SessionManager:
             log_acao(f"Tentativa de login com usuário inexistente na sessão: '{login}'")
             return False
 
+        # execute_query com RealDictCursor já retorna dict
         user = dict(row)
-        # Garante conversão correta do campo is_admin para bool
-        is_admin_flag = bool(user.get("is_admin", 0))
+        is_admin_flag = bool(user.get("is_admin", False))
 
         self.current_user = SessionUser(
             id=user["id"],
@@ -102,6 +104,14 @@ session_manager = SessionManager()
 
 
 # Funções de atalho usadas pelo resto da aplicação
+def validar_login(login: str) -> bool:
+    """
+    Função de atalho usada pela tela de login.
+    Apenas delega para session_manager.login(login).
+    """
+    return session_manager.login(login)
+
+
 def get_current_user() -> Optional[Dict[str, Any]]:
     return session_manager.get_user_info()
 

@@ -1,8 +1,7 @@
 # controle/movimentacoes.py
-import os
 import csv
-import sqlite3
 from datetime import datetime
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialog, QFormLayout, QLineEdit, QComboBox, QHeaderView,
@@ -10,17 +9,18 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QDate, QTimer
 from PyQt5.QtGui import QBrush, QColor
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+
 from utils.validacao import email_valido
 from utils.utils import montar_display_sala_por_id
 from utils.utils_log import log_acao
 from .selecionar_sala_dialog import SelecionarSalaDialog
-from autenticacao.helpers_autenticacao import get_current_user
+from autenticacao.helpers_autenticacao import get_db_connection
+from autenticacao import get_current_user
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
-ALERTA_HORAS = 4
+ALERTA_HORAS = 6
 
 
 def formatar_data_br(data_str):
@@ -74,50 +74,8 @@ class FiltroMovimentacaoDialog(QDialog):
         return {"data_ini": inicio, "data_fim": fim, "usuario": usuario, "status": status}
 
 
-def criar_tabela_utilizadores():
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS utilizadores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome  TEXT NOT NULL,
-            email TEXT,
-            ativo INTEGER NOT NULL DEFAULT 1
-        )
-    """)
-    cur.execute("PRAGMA table_info(utilizadores)")
-    cols = [r[1] for r in cur.fetchall()]
-    if "ativo" not in cols:
-        cur.execute("ALTER TABLE utilizadores ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1")
-    conn.commit()
-    conn.close()
-
-
-def criar_tabela_movimentacoes():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS movimentacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chave TEXT NOT NULL,
-            usuario TEXT,
-            email TEXT,
-            data_retirada TIMESTAMP,
-            data_retorno TIMESTAMP,
-            status TEXT DEFAULT 'disponível',
-            alerta_enviado INTEGER DEFAULT 0
-        )
-    """)
-    cursor.execute("PRAGMA table_info(movimentacoes)")
-    cols = [r[1] for r in cursor.fetchall()]
-    if "utilizador_id" not in cols:
-        cursor.execute("ALTER TABLE movimentacoes ADD COLUMN utilizador_id INTEGER")
-    conn.commit()
-    conn.close()
-
-
 def listar_movimentacoes():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT m.id,
@@ -137,7 +95,7 @@ def listar_movimentacoes():
 
 
 def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, data_fim=None, status=None):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     query = """
         SELECT m.id,
@@ -153,20 +111,20 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
     """
     params = []
     if chave:
-        query += " AND m.chave LIKE ?"
+        query += " AND m.chave ILIKE %s"
         params.append(f"%{chave}%")
     if usuario:
         usuario = usuario.strip().lower()
-        query += " AND LOWER(COALESCE(u.nome, m.usuario)) LIKE ?"
+        query += " AND LOWER(COALESCE(u.nome, m.usuario)) LIKE %s"
         params.append(f"%{usuario}%")
     if data_ini:
-        query += " AND (m.data_retirada >= ?)"
+        query += " AND (m.data_retirada >= %s)"
         params.append(data_ini)
     if data_fim:
-        query += " AND (m.data_retirada <= ?)"
+        query += " AND (m.data_retirada <= %s)"
         params.append(data_fim)
     if status and status.lower() not in ["todos", ""]:
-        query += " AND m.status = ?"
+        query += " AND m.status = %s"
         params.append(status)
     query += " ORDER BY m.data_retirada DESC"
     cursor.execute(query, params)
@@ -178,12 +136,12 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
 def registrar_retirada(sala_id, chave_display, utilizador_id, email):
     email = (email or "").strip().lower()
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     data_retirada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
-        "SELECT nome, ativo FROM utilizadores WHERE id = ?",
+        "SELECT nome, ativo FROM utilizadores WHERE id = %s",
         (utilizador_id,)
     )
     row = cursor.fetchone()
@@ -204,13 +162,13 @@ def registrar_retirada(sala_id, chave_display, utilizador_id, email):
         INSERT INTO movimentacoes (
             chave, utilizador_id, usuario, email, data_retirada, status, alerta_enviado
         )
-        VALUES (?, ?, ?, ?, ?, ?, 0)
+        VALUES (%s, %s, %s, %s, %s, %s, FALSE)
         """,
         (chave_display, utilizador_id, nome_utilizador, email, data_retirada, "indisponível")
     )
 
     cursor.execute(
-        "UPDATE salas SET status = 'indisponivel' WHERE id = ?",
+        "UPDATE salas SET status = 'indisponivel' WHERE id = %s",
         (sala_id,)
     )
 
@@ -219,17 +177,17 @@ def registrar_retirada(sala_id, chave_display, utilizador_id, email):
 
 
 def registrar_devolucao(mov_id, chave, sala_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     data_retorno = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
-        "UPDATE movimentacoes SET data_retorno=?, status='disponível' WHERE id=? AND chave=?",
+        "UPDATE movimentacoes SET data_retorno=%s, status='disponível' WHERE id=%s AND chave=%s",
         (data_retorno, mov_id, chave)
     )
 
     cursor.execute(
-        "UPDATE salas SET status = 'disponivel' WHERE id = ?",
+        "UPDATE salas SET status = 'disponivel' WHERE id = %s",
         (sala_id,)
     )
 
@@ -247,9 +205,7 @@ class MovimentacoesTab(QWidget):
         print("UI criada")
 
         try:
-            criar_tabela_utilizadores()
-            criar_tabela_movimentacoes()
-            print("Tabelas criadas")
+            # Assumindo que as tabelas já existem no Postgres (sem criar aqui)
             self.carregar_movimentacoes()
             print("Movimentações carregadas")
         except Exception as e:
@@ -259,7 +215,7 @@ class MovimentacoesTab(QWidget):
                 action="init_movimentacoes",
                 user=user_login,
                 status="error",
-                details=f"Erro ao inicializar tabela/carregar movimentações: {e}",
+                details=f"Erro ao carregar movimentações: {e}",
             )
             QMessageBox.critical(self, "Erro", f"Falha ao carregar movimentações:\n{e}")
 
@@ -416,12 +372,12 @@ class MovimentacoesTab(QWidget):
 
     def load_utilizadores_combo(self):
         self.combo_utilizador.clear()
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
             SELECT id, nome, email
             FROM utilizadores
-            WHERE ativo = 1
+            WHERE ativo = TRUE
             ORDER BY nome
         """)
         rows = cur.fetchall()
@@ -446,14 +402,18 @@ class MovimentacoesTab(QWidget):
                 return
 
             try:
-                conn = sqlite3.connect(DB_NAME)
+                conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute(
-                    "INSERT INTO utilizadores (nome, email, ativo) VALUES (?, ?, 1)",
+                    "INSERT INTO utilizadores (nome, email, ativo) VALUES (%s, %s, TRUE)",
                     (nome, email),
                 )
-                novo_id = cur.lastrowid
                 conn.commit()
+
+                # recuperar id (em psycopg2 pode usar RETURNING se preferir)
+                cur.execute("SELECT currval(pg_get_serial_sequence('utilizadores','id'))")
+                novo_id = cur.fetchone()[0]
+
                 conn.close()
 
                 self.load_utilizadores_combo()
@@ -575,14 +535,12 @@ class MovimentacoesTab(QWidget):
                 details=f"utilizador_id={utilizador_id}, email='{email}'",
             )
 
-            # limpa UI e recarrega tabela
             self.sala_id_atual = None
             self.label_sala_selecionada.clear()
             self.combo_utilizador.setCurrentIndex(0)
             self.input_email.clear()
             self.carregar_movimentacoes()
 
-            # APENAS um popup centralizado no DashMain
             dash = self._get_dash_main()
             if dash is not None:
                 dash.show_operation_done(f"Retirada registrada para a chave '{chave_registro}'!")
@@ -597,7 +555,7 @@ class MovimentacoesTab(QWidget):
             QMessageBox.critical(self, "Erro", f"Falha ao registrar retirada:\n{e}")
 
     def _obter_sala_id_por_display(self, display):
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM salas")
         rows = cursor.fetchall()
@@ -672,10 +630,8 @@ class MovimentacoesTab(QWidget):
                 details=f"mov_id={mov_id}",
             )
 
-            # atualiza tabela
             self.carregar_movimentacoes()
 
-            # APENAS um popup via DashMain
             dash = self._get_dash_main()
             if dash is not None:
                 dash.show_operation_done("Devolução registrada!")
@@ -748,7 +704,7 @@ class MovimentacoesTab(QWidget):
 
 
 def verificar_pendencias_e_enviar_emails():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""

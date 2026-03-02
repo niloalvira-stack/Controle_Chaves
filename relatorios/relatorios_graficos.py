@@ -1,26 +1,24 @@
-import os
-import sqlite3
 from datetime import datetime
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton
+
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtCore import QTimer
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from database_module import DB_NAME
 
-# ...
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br_dia(valor):
     if not valor:
         return ""
     try:
-        # valor vem como 'YYYY-MM-DD'
-        return datetime.strptime(valor, "%Y-%m-%d").strftime("%d/%m/%Y")
+        if isinstance(valor, datetime):
+            return valor.strftime("%d%m%Y")   # DDMMAAAA
+        return datetime.strptime(valor, "%Y-%m-%d").strftime("%d%m%Y")
     except Exception:
         return str(valor)
+
 
 
 class RelatorioGraficosTab(QWidget):
@@ -33,67 +31,65 @@ class RelatorioGraficosTab(QWidget):
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas)
 
-        # Botão é opcional; se não quiser, pode remover estas 3 linhas
-        #self.btn_atualizar = QPushButton("Atualizar Gráficos")
-        #self.btn_atualizar.clicked.connect(self.gerar_graficos)
-        #layout.addWidget(self.btn_atualizar)
-
         self.setLayout(layout)
 
-        # primeira geração
         self.gerar_graficos()
 
-        # atualização em tempo quase real (a cada 5 segundos, por exemplo)
+        # Atualiza a cada 30 segundos
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.gerar_graficos)
-        self.timer.start(5000)
+        self.timer.start(30000)
 
-    def gerar_graficos(self):
-        self.fig.clear()
-
-        conn = sqlite3.connect(DB_NAME)
+    def _buscar_dados(self):
+        """
+        Exemplo: quantidade de movimentações por dia (data_retirada).
+        Ajuste a query conforme o que você quiser mostrar no gráfico.
+        """
+        conn = get_db_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
-            SELECT DATE(data_retirada) as dia, COUNT(*) 
+            SELECT
+                DATE(data_retirada) AS dia,
+                COUNT(*) AS total
             FROM movimentacoes
             WHERE data_retirada IS NOT NULL
-            GROUP BY dia
-            ORDER BY dia DESC
-            LIMIT 7
+            GROUP BY DATE(data_retirada)
+            ORDER BY DATE(data_retirada)
         """)
-        resultados = cursor.fetchall()
+
+        rows = cursor.fetchall()
         conn.close()
 
-        if resultados:
-            dias_iso = [row[0] for row in reversed(resultados)]
-            dias = [formatar_data_br_dia(d) for d in dias_iso]
-            qtd = [row[1] for row in reversed(resultados)]
-        else:
-            dias = []
-            qtd = []
+        # Transforma em listas para plot
+        dias = [r[0] for r in rows]      # datetime.date
+        totais = [r[1] for r in rows]    # int
+        return dias, totais
 
+    def gerar_graficos(self):
+        """
+        Atualiza o gráfico com os dados atuais.
+        """
+        self.fig.clear()
         ax = self.fig.add_subplot(111)
-        bars = ax.bar(dias, qtd, color='cornflowerblue')
-        ax.set_ylabel("Total de Movimentações")
-        ax.set_xlabel("Dia")
-        ax.set_title("Movimentações (Últimos 7 dias)")
-        ax.grid(True, axis='y')
 
-        # rota X e ajusta layout
-        for label in ax.get_xticklabels():
-            label.set_rotation(45)
-            label.set_ha('right')
-        self.fig.tight_layout()  # evita corte de labels
+        dias, totais = self._buscar_dados()
 
-        # valores em cima de cada barra
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height + 0.1,
-                f"{int(height)}",
-                ha="center",
-                va="bottom",
-            )
+        if not dias:
+            ax.text(0.5, 0.5, "Sem dados de movimentações.",
+                    ha="center", va="center", transform=ax.transAxes)
+        else:
+            # Converte datas para rótulos no formato dd/mm/yyyy
+            labels = [formatar_data_br_dia(d) for d in dias]
+            x = range(len(dias))
+
+            ax.bar(x, totais)
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=45, ha="right")
+            ax.set_ylabel("Qtde de movimentações")
+            ax.set_xlabel("Data de retirada")
+            ax.set_title("Movimentações por dia")
+
+            self.fig.tight_layout()
 
         self.canvas.draw()

@@ -1,19 +1,12 @@
-import os
-import sqlite3
 from PyQt5.QtWidgets import (
     QPushButton, QHBoxLayout, QVBoxLayout, QTableWidget, QMessageBox, QWidget,
     QHeaderView, QFileDialog, QTableWidgetItem,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox
 )
+import csv
+
 from autenticacao import is_admin, hash_password
-
-# Caminho do banco relativo à raiz do projeto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
-
-
-def get_db_connection():
-    return sqlite3.connect(DB_NAME)
+from database_module import get_connection  # usa o mesmo banco (AppData)
 
 
 class UsuarioDialog(QDialog):
@@ -78,6 +71,12 @@ class UsuariosTab(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setColumnHidden(0, True)
+
+        # Ajustes visuais extra
+        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.setShowGrid(True)
+        self.table.setAlternatingRowColors(True)
+
         layout.addWidget(self.table)
 
         btn_layout = QHBoxLayout()
@@ -98,6 +97,7 @@ class UsuariosTab(QWidget):
         self.btn_del.clicked.connect(self.delete_user)
         self.btn_exportar.clicked.connect(self.exportar_csv)
 
+        print("DEBUG: UsuariosTab nova carregada")
         self.load_users()
 
     def _get_dash_main(self):
@@ -108,21 +108,34 @@ class UsuariosTab(QWidget):
 
     def load_users(self):
         self.table.setRowCount(0)
-        conn = get_db_connection()
+        conn = get_connection()
+        if conn is None:
+            print("DEBUG: conn é None em load_users")
+            return
+
         cursor = conn.cursor()
-        cursor.execute("SELECT id, login, nome, is_admin, primeiro_login FROM usuarios ORDER BY login")
+        cursor.execute(
+            "SELECT id, login, nome, is_admin, primeiro_login FROM usuarios ORDER BY login"
+        )
         users = cursor.fetchall()
+        print("DEBUG: users em UsuariosTab:", users)
         conn.close()
 
+        self.table.setRowCount(len(users))
         for row_idx, user in enumerate(users):
-            self.table.insertRow(row_idx)
-            for col_idx, value in enumerate(user):
-                if col_idx == 3:  # is_admin
-                    texto_admin = "Sim" if value in (1, "1", True) else "Não"
-                    item = QTableWidgetItem(texto_admin)
-                else:
-                    item = QTableWidgetItem(str(value if value is not None else ""))
-                self.table.setItem(row_idx, col_idx, item)
+            print("DEBUG preenchendo linha", row_idx, "->", user)
+            # user é RealDictRow (dict)
+            self.table.setItem(row_idx, 0, QTableWidgetItem(str(user["id"])))
+            self.table.setItem(row_idx, 1, QTableWidgetItem(user["login"]))
+            self.table.setItem(row_idx, 2, QTableWidgetItem(user["nome"]))
+
+            texto_admin = "Sim" if user["is_admin"] in (1, "1", True, "t") else "Não"
+            self.table.setItem(row_idx, 3, QTableWidgetItem(texto_admin))
+
+            texto_primeiro = "Sim" if user["primeiro_login"] in (1, "1", True, "t") else "Não"
+            self.table.setItem(row_idx, 4, QTableWidgetItem(texto_primeiro))
+
+
 
     def add_user(self):
         dialog = UsuarioDialog()
@@ -135,12 +148,14 @@ class UsuariosTab(QWidget):
 
             try:
                 hashed_pw = hash_password(dados["senha"])
-                conn = get_db_connection()
+                conn = get_connection()
+                if conn is None:
+                    return
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO usuarios (login, nome, is_admin, primeiro_login, senha)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO usuarios (login, nome, is_admin, primeiro_login, senha_hash)
+                    VALUES (%s, %s, %s, %s, %s)
                     """,
                     (dados["login"], dados["nome"], dados["is_admin"],
                      dados["primeiro_login"], hashed_pw),
@@ -152,10 +167,11 @@ class UsuariosTab(QWidget):
                 dash = self._get_dash_main()
                 if dash is not None:
                     dash.show_operation_done("Usuário criado")
-            except sqlite3.IntegrityError:
-                QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
             except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao cadastrar usuário: {e}")
+                if "UNIQUE" in str(e).upper():
+                    QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
+                else:
+                    QMessageBox.critical(self, "Erro", f"Erro ao cadastrar usuário: {e}")
 
     def edit_user(self):
         selected = self.table.selectedItems()
@@ -171,11 +187,17 @@ class UsuariosTab(QWidget):
         is_admin_value = 1 if texto_admin.strip().lower() == "sim" else 0
         primeiro_login = self.table.item(row, 4).text()
 
-        conn = get_db_connection()
+        conn = get_connection()
+        if conn is None:
+            return
         cursor = conn.cursor()
-        cursor.execute("SELECT senha FROM usuarios WHERE id=?", (user_id,))
+        cursor.execute("SELECT senha_hash FROM usuarios WHERE id=%s", (user_id,))
         senha_row = cursor.fetchone()
-        senha_atual = senha_row[0] if senha_row else ""
+        # senha_row será RealDictRow ou tupla conforme cursor_factory; aqui só precisamos do valor
+        if isinstance(senha_row, dict):
+            senha_atual = list(senha_row.values())[0] if senha_row else None
+        else:
+            senha_atual = senha_row[0] if senha_row else None
         conn.close()
 
         dialog = UsuarioDialog(login, nome, is_admin_value, primeiro_login, "")
@@ -189,13 +211,15 @@ class UsuariosTab(QWidget):
                 hashed_pw = senha_atual
 
             try:
-                conn = get_db_connection()
+                conn = get_connection()
+                if conn is None:
+                    return
                 cursor = conn.cursor()
                 cursor.execute(
                     """
                     UPDATE usuarios
-                    SET login=?, nome=?, is_admin=?, primeiro_login=?, senha=?
-                    WHERE id=?
+                    SET login=%s, nome=%s, is_admin=%s, primeiro_login=%s, senha_hash=%s
+                    WHERE id=%s
                     """,
                     (
                         dados["login"],
@@ -213,10 +237,11 @@ class UsuariosTab(QWidget):
                 dash = self._get_dash_main()
                 if dash is not None:
                     dash.show_operation_done("Usuário editado")
-            except sqlite3.IntegrityError:
-                QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
             except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao editar usuário: {e}")
+                if "UNIQUE" in str(e).upper():
+                    QMessageBox.warning(self, "Erro", "Já existe um usuário com este login.")
+                else:
+                    QMessageBox.critical(self, "Erro", f"Erro ao editar usuário: {e}")
 
     def delete_user(self):
         selected = self.table.selectedItems()
@@ -238,9 +263,11 @@ class UsuariosTab(QWidget):
             return
 
         try:
-            conn = get_db_connection()
+            conn = get_connection()
+            if conn is None:
+                return
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM usuarios WHERE id=?", (user_id,))
+            cursor.execute("DELETE FROM usuarios WHERE id=%s", (user_id,))
             conn.commit()
             conn.close()
             self.load_users()
@@ -257,14 +284,15 @@ class UsuariosTab(QWidget):
             return
 
         try:
-            with open(caminho, "w", encoding="utf-8") as f:
-                f.write("Login;Nome;Admin;Primeiro Login\n")
+            with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f, delimiter=';')
+                writer.writerow(["Login", "Nome", "Admin", "Primeiro Login"])
                 for row in range(self.table.rowCount()):
                     login = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
                     nome = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
                     admin = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
                     primeiro = self.table.item(row, 4).text() if self.table.item(row, 4) else ""
-                    f.write(f"{login};{nome};{admin};{primeiro}\n")
+                    writer.writerow([login, nome, admin, primeiro])
 
             dash = self._get_dash_main()
             if dash is not None:

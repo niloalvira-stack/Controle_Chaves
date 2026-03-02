@@ -9,6 +9,7 @@ from .relatorio_usuario_tab import RelatorioPorUsuarioTab
 from relatorios.relatorios_graficos import RelatorioGraficosTab
 
 
+
 class RelatoriosTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -3,23 +3,22 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QHeaderView, QApplication
 )
 from PyQt5.QtCore import QTimer, Qt
-import os
-import sqlite3
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from datetime import datetime
-from database_module import DB_NAME
+from reportlab.lib.styles import getSampleStyleSheet
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br(valor):
     if not valor:
         return ""
     try:
+        if isinstance(valor, datetime):
+            return valor.strftime("%d/%m/%Y %H:%M:%S")
         return datetime.strptime(valor, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
     except Exception:
         return str(valor)
@@ -28,9 +27,11 @@ def formatar_data_br(valor):
 class RelatoriosGeralTab(QWidget):
     def __init__(self):
         super().__init__()
+        self._rows_cache = []
+
         layout = QVBoxLayout(self)
 
-        # linha de botões (CSV / PDF)
+        # Botões
         btns_layout = QHBoxLayout()
 
         self.btn_exportar = QPushButton("Exportar para CSV")
@@ -43,13 +44,23 @@ class RelatoriosGeralTab(QWidget):
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         btns_layout.addWidget(self.btn_exportar_pdf)
 
+        btns_layout.addStretch()
         layout.addLayout(btns_layout)
 
+        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setColumnHidden(0, True)  # Esconde a coluna ID na interface
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"]
+        )
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.table.setColumnHidden(0, True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
@@ -57,11 +68,12 @@ class RelatoriosGeralTab(QWidget):
         self.setLayout(layout)
         self.load_relatorio()
 
-        # atualização automática
+        # Auto-refresh
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.load_relatorio)
-        self.timer.start(5000)
+        self.timer.start(10000)
 
+        # Estilo
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -106,10 +118,6 @@ class RelatoriosGeralTab(QWidget):
         return None
 
     def _query_base(self):
-        """
-        Query base com JOIN utilizadores.
-        COALESCE mantém compatibilidade com dados antigos em m.usuario.
-        """
         return """
             SELECT m.id,
                    m.chave,
@@ -122,14 +130,18 @@ class RelatoriosGeralTab(QWidget):
             ORDER BY m.data_retirada DESC
         """
 
+    def _buscar_dados(self):
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(self._query_base())
+        rows = cursor.fetchall()
+        conn.close()
+        self._rows_cache = rows
+        return rows
+
     def load_relatorio(self):
         try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
-
+            rows = self._buscar_dados()
             self.table.setRowCount(len(rows))
             for i, row in enumerate(rows):
                 for j, val in enumerate(row):
@@ -142,48 +154,60 @@ class RelatoriosGeralTab(QWidget):
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
 
     def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV Files (*.csv)")
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            QMessageBox.information(self, "Exportar CSV", "Não há dados para exportar.")
+            return
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar CSV", f"relatorio_geral_{ts}.csv", "CSV Files (*.csv)"
+        )
         if not path:
             return
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
 
+        try:
             with open(path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
+                writer = csv.writer(f, delimiter=';')
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-                for _id, chave, utilizador, status, data_ret, data_retorn in rows:
+                for _id, chave, utilizador, status, data_ret, data_retorn in self._rows_cache:
                     writer.writerow([
-                        chave,
-                        utilizador,
-                        status,
+                        chave or "",
+                        utilizador or "",
+                        status or "",
                         formatar_data_br(data_ret),
                         formatar_data_br(data_retorn),
                     ])
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação CSV geral concluída.")
+                dash.show_status_message("Exportação CSV geral concluída.")
+            else:
+                QMessageBox.information(self, "Exportar CSV", "Exportação concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF Files (*.pdf)")
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            QMessageBox.information(self, "Exportar PDF", "Não há dados para exportar.")
+            return
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar PDF", f"relatorio_geral_{ts}.pdf", "PDF Files (*.pdf)"
+        )
         if not path:
             return
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
 
+        try:
             cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             dados = [cabecalho]
-            for _id, chave, utilizador, status, data_ret, data_retorn in rows:
+            for _id, chave, utilizador, status, data_ret, data_retorn in self._rows_cache:
                 dados.append([
                     str(chave) if chave else "",
                     str(utilizador) if utilizador else "",
@@ -211,6 +235,8 @@ class RelatoriosGeralTab(QWidget):
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação PDF geral concluída.")
+                dash.show_status_message("Exportação PDF geral concluída.")
+            else:
+                QMessageBox.information(self, "Exportar PDF", "Exportação concluída.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")

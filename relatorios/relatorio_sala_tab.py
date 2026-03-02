@@ -3,31 +3,30 @@ from PyQt5.QtWidgets import (
     QFileDialog, QComboBox, QLabel, QHeaderView, QDateEdit, QApplication
 )
 from PyQt5.QtCore import QDate, Qt
-import os
-import sqlite3
 import csv
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
-from utils import montar_display_sala_variavel, show_info, show_warning
-from database_module import DB_NAME
+from reportlab.lib.styles import getSampleStyleSheet
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from utils import montar_display_sala_variavel, show_info, show_warning
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br(data_str):
     if not data_str:
         return ""
     try:
+        if isinstance(data_str, datetime):
+            return data_str.strftime("%d/%m/%Y %H:%M:%S")
         return datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
     except Exception:
-        return data_str
+        return str(data_str)
 
 
 def listar_salas_para_relatorio():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT s.nome, p.nome, a.nome
@@ -47,9 +46,10 @@ def listar_salas_para_relatorio():
 class RelatorioPorSalaTab(QWidget):
     def __init__(self):
         super().__init__()
+        self._rows_cache = []
         layout = QVBoxLayout(self)
 
-        # Filtros: sala + período
+        # Linha de filtros
         filtro_layout = QHBoxLayout()
         filtro_layout.addWidget(QLabel("Sala:"))
         self.cb_chave = QComboBox()
@@ -72,8 +72,14 @@ class RelatorioPorSalaTab(QWidget):
         self.btn_filtrar.clicked.connect(self.load_relatorio)
         filtro_layout.addWidget(self.btn_filtrar)
 
+        # contador
+        self.lbl_total = QLabel("0 registros")
+        filtro_layout.addWidget(self.lbl_total)
+
+        filtro_layout.addStretch()
         layout.addLayout(filtro_layout)
 
+        # Botões exportação
         btns_layout = QHBoxLayout()
         self.btn_exportar = QPushButton("Exportar para CSV")
         self.btn_exportar.setObjectName("btnExportarSalaCsv")
@@ -85,19 +91,26 @@ class RelatorioPorSalaTab(QWidget):
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         btns_layout.addWidget(self.btn_exportar_pdf)
 
+        btns_layout.addStretch()
         layout.addLayout(btns_layout)
 
+        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
         self.load_chaves()
-        self.table.setRowCount(0)  # começa vazio
+        self.table.setRowCount(0)
 
         self.setStyleSheet("""
             QPushButton {
@@ -161,9 +174,7 @@ class RelatorioPorSalaTab(QWidget):
         return ini, fim
 
     def _query_base(self):
-        """
-        Query base por sala + período, com JOIN utilizadores e compatibilidade com dados antigos.
-        """
+        # Postgres com parâmetros %s. [web:23][web:92]
         return """
             SELECT m.chave,
                    COALESCE(u.nome, m.usuario) AS utilizador,
@@ -172,9 +183,9 @@ class RelatorioPorSalaTab(QWidget):
                    m.data_retorno
             FROM movimentacoes m
             LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-            WHERE m.chave = ?
-              AND m.data_retirada >= ?
-              AND m.data_retirada <= ?
+            WHERE m.chave = %s
+              AND m.data_retirada >= %s
+              AND m.data_retirada <= %s
             ORDER BY m.data_retirada DESC
         """
 
@@ -183,21 +194,28 @@ class RelatorioPorSalaTab(QWidget):
         lista = listar_salas_para_relatorio()
         self.cb_chave.addItems(lista or [""])
 
-    def load_relatorio(self):
+    def _buscar_dados(self):
         chave = self.cb_chave.currentText()
         if not chave:
-            self.table.setRowCount(0)
-            return
-        data_ini, data_fim = self._get_periodo()
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
-            rows = cursor.fetchall()
-            conn.close()
+            self._rows_cache = []
+            return []
 
+        data_ini, data_fim = self._get_periodo()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(self._query_base(), (chave, data_ini, data_fim))
+        rows = cursor.fetchall()
+        conn.close()
+        self._rows_cache = rows
+        return rows
+
+    def load_relatorio(self):
+        try:
+            rows = self._buscar_dados()
             self.table.setRowCount(0)
+
             if not rows:
+                self.lbl_total.setText("0 registros")
                 show_info("Relatório", "Nenhuma movimentação encontrada para esta sala e período.")
                 return
 
@@ -214,69 +232,69 @@ class RelatorioPorSalaTab(QWidget):
                     item = QTableWidgetItem(str(val))
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(i, j, item)
+
+            self.lbl_total.setText(f"{len(rows)} registros")
+
         except Exception as e:
             show_warning("Erro", f"Erro ao carregar relatório:\n{e}")
 
     def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV Files (*.csv)")
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            show_info("Exportação", "Nenhuma movimentação encontrada para esta sala e período.")
+            return
+
+        chave = self.cb_chave.currentText() or "sala"
+        data_ini, data_fim = self._get_periodo()
+        nome_sugestao = f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.csv".replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", nome_sugestao,
+                                              "CSV Files (*.csv)")
         if not path:
             return
-        chave = self.cb_chave.currentText()
-        if not chave:
-            return
-        data_ini, data_fim = self._get_periodo()
+
         try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
-            rows = cursor.fetchall()
-            conn.close()
-
-            if not rows:
-                show_info("Exportação", "Nenhuma movimentação encontrada para esta sala e período.")
-                return
-
             with open(path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
+                writer = csv.writer(f, delimiter=';')
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-                for ch, utilizador, status, data_ret, data_dev in rows:
-                    writer.writerow([
-                        ch or "",
-                        utilizador or "",
-                        status or "",
-                        formatar_data_br(data_ret),
-                        formatar_data_br(data_dev),
-                    ])
+                for row in self._rows_cache:
+                    row = list(row)
+                    row[3] = formatar_data_br(row[3])  # retirada
+                    row[4] = formatar_data_br(row[4])  # devolução
+                    writer.writerow(row)
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação CSV por sala concluída.")
+                dash.show_status_message("Exportação CSV por sala concluída.")
+            else:
+                show_info("Sucesso", "Exportação CSV concluída.")
+
         except Exception as e:
             show_warning("Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF Files (*.pdf)")
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            show_info("Exportação", "Nenhuma movimentação encontrada para esta sala e período.")
+            return
+
+        chave = self.cb_chave.currentText() or "sala"
+        data_ini, data_fim = self._get_periodo()
+        nome_sugestao = f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.pdf".replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", nome_sugestao,
+                                              "PDF Files (*.pdf)")
         if not path:
             return
-        chave = self.cb_chave.currentText()
-        if not chave:
-            return
-        data_ini, data_fim = self._get_periodo()
+
         try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (chave, data_ini, data_fim))
-            rows = cursor.fetchall()
-            conn.close()
-
-            if not rows:
-                show_info("Exportação", "Nenhuma movimentação encontrada para esta sala e período.")
-                return
-
             cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
-            dados = [cabecalho]
-            for ch, utilizador, status, data_ret, data_dev in rows:
-                dados.append([
+            tabela_dados = [cabecalho]
+            for row in self._rows_cache:
+                ch, utilizador, status, data_ret, data_dev = row
+                tabela_dados.append([
                     ch or "",
                     utilizador or "",
                     status or "",
@@ -285,24 +303,49 @@ class RelatorioPorSalaTab(QWidget):
                 ])
 
             pdf = SimpleDocTemplate(
-                path, pagesize=A4, leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+                path,
+                pagesize=A4,
+                leftMargin=24,
+                rightMargin=24,
+                topMargin=24,
+                bottomMargin=24,
             )
-            table = Table(dados, repeatRows=1)
-            style = TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+
+            periodo_str = (
+                f"{self.data_inicio.date().toString('dd/MM/yyyy')} a "
+                f"{self.data_fim.date().toString('dd/MM/yyyy')}"
+            )
+
+            story = []
+            titulo = Paragraph(
+                f"Relatório de Movimentações por Sala<br/>{chave}<br/>{periodo_str}",
+                getSampleStyleSheet()["Title"]
+            )
+            story.append(titulo)
+            story.append(Spacer(1, 12))
+
+            tabela = Table(tabela_dados, repeatRows=1)
+            tabela.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ])
-            table.setStyle(style)
-            pdf.build([table])
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+                 [colors.whitesmoke, colors.lightgrey]),
+            ]))
+            story.append(tabela)
+
+            pdf.build(story)
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação PDF por sala concluída.")
+                dash.show_status_message("Exportação PDF por sala concluída.")
+            else:
+                show_info("Sucesso", "Exportação PDF concluída.")
+
         except Exception as e:
             show_warning("Erro", f"Erro ao exportar PDF:\n{e}")

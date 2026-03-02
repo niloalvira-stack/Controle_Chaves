@@ -3,32 +3,37 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView, QApplication
 )
 from PyQt5.QtCore import QDate, Qt
-import sqlite3
 import csv
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
 from datetime import datetime
+from reportlab.lib.styles import getSampleStyleSheet
 
-from database_module import DB_NAME
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br(data_str):
     if not data_str:
         return ""
     try:
+        if isinstance(data_str, datetime):
+            return data_str.strftime("%d/%m/%Y %H:%M:%S")
         return datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
     except Exception:
-        return data_str
+        return str(data_str)
 
 
 class RelatorioPorPeriodoTab(QWidget):
     def __init__(self):
         super().__init__()
+        self._rows_cache = []  # cache do último filtro
         layout = QVBoxLayout(self)
 
+        # Filtros de período
         filtros_layout = QHBoxLayout()
         filtros_layout.addWidget(QLabel("Data Início:"))
+
         self.data_inicio = QDateEdit()
         self.data_inicio.setCalendarPopup(True)
         self.data_inicio.setDisplayFormat("dd/MM/yyyy")
@@ -46,8 +51,15 @@ class RelatorioPorPeriodoTab(QWidget):
         self.btn_filtrar.setObjectName("btnFiltrarPeriodo")
         self.btn_filtrar.clicked.connect(self.load_relatorio)
         filtros_layout.addWidget(self.btn_filtrar)
+
+        # Contador
+        self.lbl_total = QLabel("0 registros")
+        filtros_layout.addWidget(self.lbl_total)
+
+        filtros_layout.addStretch()
         layout.addLayout(filtros_layout)
 
+        # Botões exportação
         btns_layout = QHBoxLayout()
         self.btn_exportar = QPushButton("Exportar para CSV")
         self.btn_exportar.setObjectName("btnExportarPeriodoCsv")
@@ -58,20 +70,29 @@ class RelatorioPorPeriodoTab(QWidget):
         self.btn_exportar_pdf.setObjectName("btnExportarPeriodoPdf")
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
         btns_layout.addWidget(self.btn_exportar_pdf)
+
+        btns_layout.addStretch()
         layout.addLayout(btns_layout)
 
+        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(
             ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
         )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)          # Chave
+        header.setSectionResizeMode(1, QHeaderView.Stretch)          # Utilizador
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents) # Status
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents) # Retirada
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents) # Devolução
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
 
+        # Estilo
         self.setStyleSheet("""
             QPushButton {
                 padding: 10px 24px;
@@ -136,9 +157,7 @@ class RelatorioPorPeriodoTab(QWidget):
         return inicio, fim
 
     def _query_base(self):
-        """
-        Query base por período, com JOIN utilizadores e compatibilidade com dados antigos.
-        """
+        # Postgres, usando BETWEEN em timestamp (ok para esse uso pontual). [web:91]
         return """
             SELECT m.id,
                    m.chave,
@@ -148,20 +167,25 @@ class RelatorioPorPeriodoTab(QWidget):
                    m.data_retorno
             FROM movimentacoes m
             LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-            WHERE m.data_retirada >= ? AND m.data_retirada <= ?
+            WHERE m.data_retirada BETWEEN %s AND %s
             ORDER BY m.data_retirada DESC
         """
 
-    def load_relatorio(self):
+    def _buscar_dados(self):
         inicio, fim = self._periodo()
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (inicio, fim))
-            rows = cursor.fetchall()
-            conn.close()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(self._query_base(), (inicio, fim))
+        rows = cursor.fetchall()
+        conn.close()
+        self._rows_cache = rows
+        return rows
 
+    def load_relatorio(self):
+        try:
+            rows = self._buscar_dados()
             self.table.setRowCount(len(rows))
+
             for i, row in enumerate(rows):
                 # row: [id, chave, utilizador, status, data_retirada, data_retorno]
                 for j, val in enumerate(row[1:]):
@@ -170,27 +194,33 @@ class RelatorioPorPeriodoTab(QWidget):
                     item = QTableWidgetItem(str(val) if val else "")
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(i, j, item)
+
+            self.lbl_total.setText(f"{len(rows)} registros")
+
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
 
     def exportar_csv(self):
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            QMessageBox.information(self, "Informação", "Nenhum registro para exportar.")
+            return
+
+        inicio, fim = self._periodo()
+        nome_sugestao = f"relatorio_periodo_{inicio[:10]}_a_{fim[:10]}.csv".replace("-", "")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar CSV", "", "CSV Files (*.csv)"
+            self, "Salvar CSV", nome_sugestao, "CSV Files (*.csv)"
         )
         if not path:
             return
-        inicio, fim = self._periodo()
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (inicio, fim))
-            rows = cursor.fetchall()
-            conn.close()
 
+        try:
             with open(path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
+                writer = csv.writer(f, delimiter=';')
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-                for row in rows:
+                for row in self._rows_cache:
                     row = list(row)
                     row[4] = formatar_data_br(row[4])  # retirada
                     row[5] = formatar_data_br(row[5])  # devolução
@@ -198,27 +228,33 @@ class RelatorioPorPeriodoTab(QWidget):
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação CSV por período concluída.")
+                dash.show_status_message("Exportação CSV por período concluída.")
+            else:
+                QMessageBox.information(self, "Sucesso", "Exportação CSV concluída.")
+
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
+        if not self._rows_cache:
+            self._buscar_dados()
+
+        if not self._rows_cache:
+            QMessageBox.information(self, "Informação", "Nenhum registro para exportar.")
+            return
+
+        inicio, fim = self._periodo()
+        nome_sugestao = f"relatorio_periodo_{inicio[:10]}_a_{fim[:10]}.pdf".replace("-", "")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar PDF", "", "PDF Files (*.pdf)"
+            self, "Salvar PDF", nome_sugestao, "PDF Files (*.pdf)"
         )
         if not path:
             return
-        inicio, fim = self._periodo()
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base(), (inicio, fim))
-            rows = cursor.fetchall()
-            conn.close()
 
+        try:
             cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             tabela_dados = [cabecalho]
-            for row in rows:
+            for row in self._rows_cache:
                 row = list(row)
                 row[4] = formatar_data_br(row[4])
                 row[5] = formatar_data_br(row[5])
@@ -232,22 +268,40 @@ class RelatorioPorPeriodoTab(QWidget):
                 topMargin=24,
                 bottomMargin=24,
             )
-            table = Table(tabela_dados, repeatRows=1)
-            style = TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+
+            periodo_str = (
+                f"{self.data_inicio.date().toString('dd/MM/yyyy')} a "
+                f"{self.data_fim.date().toString('dd/MM/yyyy')}"
+            )
+
+            story = []
+            titulo = Paragraph(f"Relatório de Movimentações por Período<br/>{periodo_str}",
+                               getSampleStyleSheet()["Title"])
+            story.append(titulo)
+            story.append(Spacer(1, 12))
+
+            tabela = Table(tabela_dados, repeatRows=1)
+            tabela.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ])
-            table.setStyle(style)
-            pdf.build([table])
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+                 [colors.whitesmoke, colors.lightgrey]),
+            ]))
+            story.append(tabela)
+
+            pdf.build(story)
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Exportação PDF por período concluída.")
+                dash.show_status_message("Exportação PDF por período concluída.")
+            else:
+                QMessageBox.information(self, "Sucesso", "Exportação PDF concluída.")
+
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")

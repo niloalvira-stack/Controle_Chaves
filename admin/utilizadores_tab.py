@@ -1,5 +1,6 @@
 # admin/utilizadores_tab.py
 import csv
+import logging
 from contextlib import closing
 
 from PyQt5.QtWidgets import (
@@ -7,39 +8,40 @@ from PyQt5.QtWidgets import (
     QPushButton, QMessageBox, QInputDialog, QLineEdit, QDialog,
     QFormLayout, QDialogButtonBox, QSizePolicy, QHeaderView, QFileDialog
 )
+from PyQt5.QtCore import Qt
 
-from autenticacao.helpers_autenticacao import (
-    get_db_connection, get_current_user, validar_login, is_admin
-)
+from autenticacao.helpers_autenticacao import get_db_connection
+from autenticacao import get_current_user, validar_login, is_admin
+
+logger = logging.getLogger(__name__)
 
 
 class UtilizadorDialog(QDialog):
-    """
-    Diálogo simples para cadastro de utilizador.
-    Trabalha com a tabela `utilizadores` (nome, email).
-    """
-    def __init__(self, parent=None, dados=None):
+    """Diálogo para cadastro/edição de utilizador."""
+
+    def __init__(self, parent=None, dados=None, titulo="Cadastro de Utilizador"):
         super().__init__(parent)
-        self.setWindowTitle("Cadastro de Utilizador")
+        self.setWindowTitle(titulo)
+        self.setModal(True)
+        self.resize(400, 150)
 
         layout = QFormLayout(self)
-
         self.edit_nome = QLineEdit()
         self.edit_email = QLineEdit()
 
-        layout.addRow("Nome:", self.edit_nome)
+        layout.addRow("Nome *:", self.edit_nome)
         layout.addRow("Email:", self.edit_email)
 
         if dados:
             self.edit_nome.setText(dados.get("nome", ""))
             self.edit_email.setText(dados.get("email", ""))
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-
-        self.setLayout(layout)
 
     def get_dados(self):
         return {
@@ -47,74 +49,240 @@ class UtilizadorDialog(QDialog):
             "email": self.edit_email.text().strip(),
         }
 
+    def is_valid(self):
+        return bool(self.edit_nome.text().strip())
+
 
 class UtilizadoresTab(QWidget):
     def __init__(self, movimentacoes_tab=None):
-        """
-        movimentacoes_tab: referência opcional para MovimentacoesTab,
-        usada para recarregar o combo de utilizadores após ativar/desativar.
-        """
         super().__init__()
         self.movimentacoes_tab = movimentacoes_tab
+        self.setup_ui()
+        self.setup_connections()
+        self.load_utilizadores()
 
+    def setup_ui(self):
+        """Configura a interface do usuário."""
         self.setWindowTitle("Gestão de Utilizadores")
-        self.resize(700, 400)
+        self.resize(800, 500)
 
-        self.layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
-        # Tabela de utilizadores: id, nome, email, ativo
+        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["ID", "Nome", "Email", "Ativo"])
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
-
-        # Faz a tabela ocupar todo o espaço disponível
+        self.table.setAlternatingRowColors(True)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # ID fixo
+        header.setSectionResizeMode(1, QHeaderView.Stretch)           # Nome
+        header.setSectionResizeMode(2, QHeaderView.Stretch)           # Email
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Ativo
 
-        # Barra de botões (sem Editar)
+        # Botões
         btn_layout = QHBoxLayout()
+        self.btn_add = QPushButton("➕ Adicionar")
+        self.btn_toggle = QPushButton("🔄 Ativar/Desativar")
+        self.btn_delete = QPushButton("🗑️ Excluir")
+        self.btn_export = QPushButton("📊 Exportar CSV")
 
-        self.btn_add = QPushButton("Adicionar")
-        self.btn_toggle = QPushButton("Desativar / Reativar")
-        self.btn_delete = QPushButton("Excluir")
-        self.btn_export = QPushButton("Exportar CSV")
+        for btn in (self.btn_add, self.btn_toggle, self.btn_delete, self.btn_export):
+            btn_layout.addWidget(btn)
 
-        btn_layout.addWidget(self.btn_add)
-        btn_layout.addWidget(self.btn_toggle)
-        btn_layout.addWidget(self.btn_delete)
-        btn_layout.addWidget(self.btn_export)
+        layout.addWidget(self.table)
+        layout.addLayout(btn_layout)
+        self.setLayout(layout)
 
-        self.layout.addWidget(self.table)
-        self.layout.addLayout(btn_layout)
-
-        # Conexões de sinais
+    def setup_connections(self):
+        """Conecta sinais aos slots."""
         self.btn_add.clicked.connect(self.adicionar_utilizador)
         self.btn_toggle.clicked.connect(self.desativar_reativar_utilizador)
         self.btn_delete.clicked.connect(self.excluir_utilizador)
         self.btn_export.clicked.connect(self.exportar_csv)
 
-        self.load_utilizadores()
-
-    # ========= Utilitário para acessar DashMain ==========
     def _get_dash_main(self):
-        """
-        Sobe na hierarquia de parents até encontrar a janela principal (DashMain),
-        para poder chamar show_operation_done.
-        """
-        janela = self.parentWidget()
-        while janela is not None and janela.__class__.__name__ != "DashMain":
-            janela = janela.parentWidget()
-        return janela
+        """Encontra DashMain na hierarquia de parents."""
+        widget = self.parentWidget()
+        while widget and widget.__class__.__name__ != "DashMain":
+            widget = widget.parentWidget()
+        return widget
 
-    # ========= Exportar CSV ==========
+    def show_success(self, mensagem):
+        """Exibe mensagem de sucesso via DashMain ou QMessageBox."""
+        dash = self._get_dash_main()
+        if dash:
+            dash.show_operation_done(mensagem)
+        else:
+            QMessageBox.information(self, "Sucesso", mensagem)
+
+    def _get_selected_user(self):
+        """Retorna (id, nome) do utilizador selecionado ou None."""
+        selected = self.table.selectedItems()
+        if not selected:
+            QMessageBox.warning(self, "Atenção", "Selecione um utilizador!")
+            return None
+
+        row = selected[0].row()
+        try:
+            util_id = int(self.table.item(row, 0).text())
+            nome = self.table.item(row, 1).text()
+            return util_id, nome
+        except (ValueError, AttributeError):
+            QMessageBox.warning(self, "Erro", "Dados inválidos na seleção!")
+            return None
+
+    def load_utilizadores(self):
+        """Carrega utilizadores da base de dados."""
+        try:
+            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
+                cur.execute(
+                    "SELECT id, nome, email, ativo FROM utilizadores ORDER BY nome"
+                )
+                rows = cur.fetchall()
+
+            self.table.setRowCount(len(rows))
+            for r, (uid, nome, email, ativo) in enumerate(rows):
+                self.table.setItem(r, 0, QTableWidgetItem(str(uid)))
+                self.table.setItem(r, 1, QTableWidgetItem(nome or ""))
+                self.table.setItem(r, 2, QTableWidgetItem(email or ""))
+                self.table.setItem(r, 3, QTableWidgetItem("✅" if ativo else "❌"))
+
+            logger.info(f"Carregados {len(rows)} utilizadores")
+        except Exception as e:
+            logger.error(f"Erro ao carregar utilizadores: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar dados: {e}")
+
+    def adicionar_utilizador(self):
+        """Adiciona novo utilizador."""
+        dialog = UtilizadorDialog(self)
+        if dialog.exec() != dialog.Accepted or not dialog.is_valid():
+            return
+
+        dados = dialog.get_dados()
+        try:
+            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
+                cur.execute(
+                    "INSERT INTO utilizadores (nome, email, ativo) VALUES (%s, %s, %s)",
+                    (dados["nome"], dados["email"], True)
+                )
+                conn.commit()
+
+            self.load_utilizadores()
+            self._atualizar_combo_movimentacoes()
+            self.show_success("Utilizador criado com sucesso!")
+
+        except Exception as e:
+            logger.error(f"Erro ao adicionar utilizador: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao criar utilizador: {e}")
+
+    def desativar_reativar_utilizador(self):
+        """Alterna status ativo/inativo."""
+        user_data = self._get_selected_user()
+        if not user_data:
+            return
+
+        util_id, nome = user_data
+        row = self.table.currentRow()
+        status_atual = self.table.item(row, 3).text() == "✅"
+        novo_status = not status_atual  # True / False
+
+        try:
+            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
+                cur.execute(
+                    "UPDATE utilizadores SET ativo = %s WHERE id = %s",
+                    (novo_status, util_id)
+                )
+                conn.commit()
+
+            self.load_utilizadores()
+            self._atualizar_combo_movimentacoes()
+            status_texto = "ativado" if novo_status else "desativado"
+            self.show_success(f"Utilizador '{nome}' {status_texto}")
+
+        except Exception as e:
+            logger.error(f"Erro ao alterar status: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao alterar status: {e}")
+
+    def excluir_utilizador(self):
+        """Exclui utilizador com validações."""
+        user_data = self._get_selected_user()
+        if not user_data:
+            return
+
+        util_id, nome = user_data
+
+        # Verifica movimentações
+        try:
+            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM movimentacoes 
+                    WHERE utilizador_id = %s OR usuario = %s
+                    """,
+                    (util_id, nome)
+                )
+                qtd = cur.fetchone()[0]
+        except Exception as e:
+            logger.error(f"Erro ao verificar movimentações: {e}")
+            return
+
+        if qtd > 0:
+            QMessageBox.warning(
+                self, "Não permitido",
+                "Este utilizador possui movimentações associadas.\n"
+                "Use apenas 'Ativar/Desativar'."
+            )
+            return
+
+        # Validação de senha para não-admins
+        if not is_admin():
+            user = get_current_user()
+            if not user:
+                QMessageBox.warning(self, "Erro", "Nenhum usuário logado.")
+                return
+
+            senha, ok = QInputDialog.getText(
+                self, "🔐 Confirmação de Senha",
+                f"Digite sua senha para excluir '{nome}':",
+                QLineEdit.Password
+            )
+            if not ok or not validar_login(user["login"], senha):
+                QMessageBox.warning(self, "Acesso Negado", "Senha inválida!")
+                return
+
+        # Confirmação final
+        resp = QMessageBox.question(
+            self, "⚠️ Confirmar Exclusão",
+            f"Excluir permanentemente o utilizador '{nome}'?\n\n"
+            "Esta ação não pode ser desfeita!",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        try:
+            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
+                cur.execute("DELETE FROM utilizadores WHERE id = %s", (util_id,))
+                conn.commit()
+
+            self.load_utilizadores()
+            self._atualizar_combo_movimentacoes()
+            self.show_success("Utilizador excluído permanentemente!")
+
+        except Exception as e:
+            logger.error(f"Erro ao excluir utilizador: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao excluir: {e}")
+
     def exportar_csv(self):
+        """Exporta tabela para CSV."""
         path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Exportar Utilizadores",
-            "",
+            self, "📊 Exportar Utilizadores",
+            "utilizadores.csv",
             "CSV Files (*.csv)"
         )
         if not path:
@@ -123,203 +291,29 @@ class UtilizadoresTab(QWidget):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter=";")
-                headers = [
-                    self.table.horizontalHeaderItem(c).text()
-                    for c in range(self.table.columnCount())
-                ]
+                # Headers
+                headers = [self.table.horizontalHeaderItem(c).text()
+                           for c in range(self.table.columnCount())]
                 writer.writerow(headers)
 
+                # Dados
                 for row in range(self.table.rowCount()):
-                    linha = []
-                    for col in range(self.table.columnCount()):
-                        item = self.table.item(row, col)
-                        linha.append(item.text() if item else "")
+                    linha = [self.table.item(row, col).text()
+                             if self.table.item(row, col) else ""
+                             for col in range(self.table.columnCount())]
                     writer.writerow(linha)
 
-            dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_operation_done("Exportação de utilizadores concluída.")
+            self.show_success(f"Exportado para: {path}")
+            logger.info(f"CSV exportado: {path}")
+
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
+            logger.error(f"Erro no export CSV: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar: {e}")
 
-    # ========= Carregar dados ==========
-    def load_utilizadores(self):
-        with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
-            cur.execute(
-                """
-                SELECT id, nome, email, ativo
-                FROM utilizadores
-                ORDER BY nome
-                """
-            )
-            rows = cur.fetchall()
-
-        self.table.setRowCount(len(rows))
-        for r, (uid, nome, email, ativo) in enumerate(rows):
-            self.table.setItem(r, 0, QTableWidgetItem(str(uid)))
-            self.table.setItem(r, 1, QTableWidgetItem(str(nome)))
-            self.table.setItem(r, 2, QTableWidgetItem(str(email) if email else ""))
-            self.table.setItem(r, 3, QTableWidgetItem("Sim" if ativo else "Não"))
-
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.Stretch)
-
-    # ========= Adicionar ==========
-    def adicionar_utilizador(self):
-        dialog = UtilizadorDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
-            dados = dialog.get_dados()
-            if not dados["nome"]:
-                QMessageBox.warning(
-                    self,
-                    "Erro",
-                    "Preencha pelo menos o nome do utilizador."
-                )
-                return
-            try:
-                with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO utilizadores (nome, email, ativo)
-                        VALUES (?, ?, 1)
-                        """,
-                        (dados["nome"], dados["email"]),
-                    )
-                    conn.commit()
-
-                self.load_utilizadores()
-                self._atualizar_combo_movimentacoes()
-
-                dash = self._get_dash_main()
-                if dash is not None:
-                    dash.show_operation_done("Utilizador criado")
-            except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "Erro",
-                    f"Erro ao criar utilizador: {e}"
-                )
-
-    # ========= Desativar / Reativar ==========
-    def desativar_reativar_utilizador(self):
-        selected = self.table.selectedItems()
-        if not selected:
-            QMessageBox.warning(self, "Atenção", "Selecione um utilizador!")
-            return
-
-        row = selected[0].row()
-        util_id = int(self.table.item(row, 0).text())
-        status_atual = self.table.item(row, 3).text() == "Sim"
-        novo_status = not status_atual
-
-        with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
-            cur.execute(
-                "UPDATE utilizadores SET ativo = ? WHERE id = ?",
-                (1 if novo_status else 0, util_id),
-            )
-            conn.commit()
-
-        self.load_utilizadores()
-        self._atualizar_combo_movimentacoes()
-
-        dash = self._get_dash_main()
-        if dash is not None:
-            msg = "Utilizador ativado" if novo_status else "Utilizador desativado"
-            dash.show_operation_done(msg)
-
-    # ========= Exclusão com checagem de movimentações + senha ==========
-    def excluir_utilizador(self):
-        selected = self.table.selectedItems()
-        if not selected:
-            QMessageBox.warning(
-                self,
-                "Atenção",
-                "Selecione um utilizador para excluir!"
-            )
-            return
-
-        row = selected[0].row()
-        util_id = int(self.table.item(row, 0).text())
-        nome = self.table.item(row, 1).text()
-
-        with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
-            cur.execute(
-                """
-                SELECT COUNT(*)
-                FROM movimentacoes
-                WHERE utilizador_id = ? OR usuario = ?
-                """,
-                (util_id, nome),
-            )
-            qtd, = cur.fetchone()
-
-        if qtd > 0:
-            QMessageBox.warning(
-                self,
-                "Não permitido",
-                "Este utilizador possui movimentações e não pode ser excluído.\n"
-                "Use apenas desativar.",
-            )
-            return
-
-        user = get_current_user()
-        if not user:
-            QMessageBox.warning(self, "Erro", "Nenhum usuário logado.")
-            return
-
-        if not is_admin():
-            senha, ok = QInputDialog.getText(
-                self,
-                "Confirmação necessária",
-                f"Digite a sua senha para excluir o utilizador '{nome}':",
-                QLineEdit.Password,
-            )
-            if not ok:
-                return
-
-            if not validar_login(user["login"], senha):
-                QMessageBox.warning(
-                    self,
-                    "Senha incorreta",
-                    "Senha inválida. Operação cancelada."
-                )
-                return
-
-        resp = QMessageBox.question(
-            self,
-            "Confirmar exclusão",
-            f"Excluir permanentemente o utilizador '{nome}'?",
-            QMessageBox.Yes | QMessageBox.No,
-        )
-        if resp != QMessageBox.Yes:
-            return
-
-        try:
-            with closing(get_db_connection()) as conn, closing(conn.cursor()) as cur:
-                cur.execute("DELETE FROM utilizadores WHERE id = ?", (util_id,))
-                conn.commit()
-
-            self.load_utilizadores()
-            self._atualizar_combo_movimentacoes()
-
-            dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_operation_done("Utilizador excluído")
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Erro",
-                f"Erro ao excluir utilizador: {e}"
-            )
-
-    # ========= Integração com MovimentacoesTab ==========
     def _atualizar_combo_movimentacoes(self):
-        """
-        Se a MovimentacoesTab foi passada no construtor,
-        força recarregar o combo de utilizadores (apenas ativos).
-        """
-        if self.movimentacoes_tab is not None:
+        """Atualiza combo de utilizadores na aba de movimentações."""
+        if self.movimentacoes_tab:
             try:
                 self.movimentacoes_tab.load_utilizadores_combo()
             except Exception as e:
-                print(f"Erro ao atualizar combo de utilizadores na MovimentacoesTab: {e}")
+                logger.warning(f"Falha ao atualizar combo: {e}")

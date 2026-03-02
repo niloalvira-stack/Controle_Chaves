@@ -1,232 +1,134 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QHeaderView, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
+    QTableWidgetItem, QFileDialog, QMessageBox, QHeaderView,
+    QLabel, QProgressBar
 )
-from PyQt5.QtCore import QTimer, Qt
-import sqlite3
+from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal, QDateTime
 import csv
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
+import logging
 from datetime import datetime
-from database_module import DB_NAME  # usa DB_NAME central
+
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+
+from autenticacao.helpers_autenticacao import get_db_connection
+
+logger = logging.getLogger(__name__)
 
 
 def formatar_data_br(data_str):
+    """Formata data ISO para BR com fallback."""
     if not data_str:
-        return ""
+        return "—"
     try:
-        return datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
+        if isinstance(data_str, datetime):
+            return data_str.strftime("%d/%m %H:%M")
+        return datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m %H:%M")
     except Exception:
-        return data_str
+        s = str(data_str)
+        return s[:16] if len(s) > 16 else s
+
+
+class PendenciasLoader(QThread):
+    """Thread para carregamento assíncrono de pendências."""
+    data_loaded = pyqtSignal(list, int)
+    error_occurred = pyqtSignal(str)
+
+    def run(self):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    m.chave,
+                    COALESCE(u.nome, m.usuario) AS utilizador,
+                    m.status,
+                    m.data_retirada,
+                    m.data_retorno,
+                    m.id
+                FROM movimentacoes m
+                LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+                WHERE m.status = 'indisponível'
+                ORDER BY m.data_retirada ASC
+            """)
+            rows = cursor.fetchall()
+            conn.close()
+
+            total = len(rows)
+            self.data_loaded.emit(rows, total)
+
+        except Exception as e:
+            logger.exception("Erro ao carregar pendências")
+            self.error_occurred.emit(str(e))
 
 
 class RelatorioPendenciasTab(QWidget):
-    def __init__(self):
-        super().__init__()
+    """
+    Aba de relatório de pendências, usando PendenciasLoader para buscar dados.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
         layout = QVBoxLayout(self)
 
-        btn_layout = QHBoxLayout()
-        self.btn_exportar_csv = QPushButton("Exportar para CSV")
-        self.btn_exportar_csv.setObjectName("btnPendenciasCsv")
-        self.btn_exportar_csv.clicked.connect(self.exportar_csv)
-        btn_layout.addWidget(self.btn_exportar_csv)
-
-        self.btn_exportar_pdf = QPushButton("Exportar para PDF")
-        self.btn_exportar_pdf.setObjectName("btnPendenciasPdf")
-        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
-        btn_layout.addWidget(self.btn_exportar_pdf)
-
-        layout.addLayout(btn_layout)
-
+        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
-        )
+        self.table.setHorizontalHeaderLabels([
+            "Chave", "Utilizador", "Status", "Data Retirada", "Data Retorno"
+        ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.table)
 
+        # Barra de progresso / status
+        bottom = QHBoxLayout()
+        self.label_status = QLabel("Pendências: 0")
+        self.progress = QProgressBar()
+        self.progress.setMaximum(0)
+        self.progress.setVisible(False)
+
+        btn_atualizar = QPushButton("Atualizar")
+        btn_atualizar.clicked.connect(self.carregar_pendencias)
+
+        bottom.addWidget(self.label_status)
+        bottom.addStretch()
+        bottom.addWidget(self.progress)
+        bottom.addWidget(btn_atualizar)
+
+        layout.addLayout(bottom)
         self.setLayout(layout)
 
-        self.setStyleSheet("""
-            QPushButton {
-                padding: 10px 24px;
-                min-height: 34px;
-                min-width: 140px;
-                border-radius: 6px;
-                border: 1px solid #888;
-                font-weight: 500;
-            }
+        # Loader em thread
+        self.loader = PendenciasLoader()
+        self.loader.data_loaded.connect(self._atualizar_tabela)
+        self.loader.error_occurred.connect(self._mostrar_erro)
 
-            QPushButton#btnPendenciasCsv {
-                background-color: #2e7d32;
-                color: white;
-                border: 1px solid #1b5e20;
-            }
-            QPushButton#btnPendenciasCsv:hover {
-                background-color: #388e3c;
-            }
-            QPushButton#btnPendenciasCsv:pressed {
-                background-color: #1b5e20;
-            }
+        # Carrega inicial
+        self.carregar_pendencias()
 
-            QPushButton#btnPendenciasPdf {
-                background-color: #1565c0;
-                color: white;
-                border: 1px solid #0d47a1;
-            }
-            QPushButton#btnPendenciasPdf:hover {
-                background-color: #1976d2;
-            }
-            QPushButton#btnPendenciasPdf:pressed {
-                background-color: #0d47a1;
-            }
-        """)
+    def carregar_pendencias(self):
+        self.progress.setVisible(True)
+        self.label_status.setText("Carregando pendências...")
+        self.loader.start()
 
-        # primeira carga
-        self.load_relatorio()
+    def _atualizar_tabela(self, rows, total):
+        self.progress.setVisible(False)
 
-        # atualização automática em tempo quase real (a cada 5 segundos)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.load_relatorio)
-        self.timer.start(5000)
+        self.table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            chave, utilizador, status, dt_retirada, dt_retorno, mov_id = row
 
-    def _get_dash_main(self):
-        """
-        Recupera a janela principal (DashMain) para usar show_operation_done.
-        """
-        app = QApplication.instance()
-        if not app:
-            return None
-        for widget in app.topLevelWidgets():
-            if widget.__class__.__name__ == "DashMain":
-                return widget
-        return None
+            self.table.setItem(i, 0, QTableWidgetItem(str(chave)))
+            self.table.setItem(i, 1, QTableWidgetItem(str(utilizador)))
+            self.table.setItem(i, 2, QTableWidgetItem(str(status)))
+            self.table.setItem(i, 3, QTableWidgetItem(formatar_data_br(dt_retirada)))
+            self.table.setItem(i, 4, QTableWidgetItem(formatar_data_br(dt_retorno)))
 
-    def _query_base(self):
-        """
-        Pendências: status 'indisponível', com JOIN utilizadores.
-        COALESCE garante compatibilidade com dados antigos.
-        """
-        return """
-            SELECT m.chave,
-                   COALESCE(u.nome, m.usuario) AS utilizador,
-                   m.status,
-                   m.data_retirada,
-                   m.data_retorno
-            FROM movimentacoes m
-            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-            WHERE m.status = 'indisponível'
-            ORDER BY m.data_retirada DESC
-        """
+        self.label_status.setText(f"Pendências: {total}")
 
-    def load_relatorio(self):
-        try:
-            self.table.setRowCount(0)
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
-
-            self.table.setRowCount(len(rows))
-            for i, (chave, utilizador, status, data_ret, data_dev) in enumerate(rows):
-                valores = [
-                    chave or "",
-                    utilizador or "",
-                    status or "",
-                    formatar_data_br(data_ret),
-                    formatar_data_br(data_dev),
-                ]
-                for j, val in enumerate(valores):
-                    item = QTableWidgetItem(str(val))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(i, j, item)
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
-
-    def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar CSV", "", "CSV Files (*.csv)"
-        )
-        if not path:
-            return
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
-
-            with open(path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
-                for chave, utilizador, status, data_ret, data_dev in rows:
-                    writer.writerow([
-                        chave or "",
-                        utilizador or "",
-                        status or "",
-                        formatar_data_br(data_ret),
-                        formatar_data_br(data_dev),
-                    ])
-
-            dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_operation_done("Exportação CSV de pendências concluída.")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
-
-    def exportar_pdf(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar PDF", "", "PDF Files (*.pdf)"
-        )
-        if not path:
-            return
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(self._query_base())
-            rows = cursor.fetchall()
-            conn.close()
-
-            cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
-            tabela_dados = [cabecalho]
-            for chave, utilizador, status, data_ret, data_dev in rows:
-                tabela_dados.append([
-                    chave or "",
-                    utilizador or "",
-                    status or "",
-                    formatar_data_br(data_ret),
-                    formatar_data_br(data_dev),
-                ])
-
-            pdf = SimpleDocTemplate(
-                path,
-                pagesize=A4,
-                leftMargin=24,
-                rightMargin=24,
-                topMargin=24,
-                bottomMargin=24,
-            )
-            table = Table(tabela_dados, repeatRows=1)
-            style = TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ])
-            table.setStyle(style)
-            pdf.build([table])
-
-            dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_operation_done("Exportação PDF de pendências concluída.")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF:\n{e}")
+    def _mostrar_erro(self, msg):
+        self.progress.setVisible(False)
+        QMessageBox.critical(self, "Erro", f"Erro ao carregar pendências:\n{msg}")

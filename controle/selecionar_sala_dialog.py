@@ -1,5 +1,4 @@
 import os
-import sqlite3
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QLineEdit, QLabel, QHeaderView, QDialogButtonBox, QMessageBox
@@ -7,8 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 class SelecionarSalaDialog(QDialog):
@@ -20,7 +18,6 @@ class SelecionarSalaDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Selecionar Sala")
 
-        # tamanho fixo maior
         self.setFixedSize(800, 500)
 
         self.sala_id_selecionada = None
@@ -67,7 +64,8 @@ class SelecionarSalaDialog(QDialog):
 
     def _carregar_salas(self):
         self.table.setRowCount(0)
-        conn = sqlite3.connect(DB_NAME)
+
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT s.id, s.nome, p.nome, a.nome, s.status

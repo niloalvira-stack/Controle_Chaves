@@ -1,18 +1,29 @@
-import os
-import sqlite3
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))  # se o arquivo fica na raiz do projeto
-DB_NAME = os.path.join(BASE_DIR, "controle_chaves.db")
+import psycopg2
+import psycopg2.extras
+from utils.config_app import get_db_config
 
 
 def get_connection():
+    """
+    Abre conexão com PostgreSQL usando os dados do config.ini.
+    """
+    cfg = get_db_config()
+
     try:
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
+        conn = psycopg2.connect(
+            host=cfg["host"],
+            port=cfg["port"],
+            dbname=cfg["database"],
+            user=cfg["user"],
+            password=cfg["password"],
+        )
+        # Devolve linhas como dict (similar ao sqlite3.Row)
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
         return conn
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Erro ao conectar no banco de dados: {e}")
         return None
+
 
 def execute_query(query, params=(), fetchone=False, fetchall=False):
     conn = get_connection()
@@ -20,17 +31,18 @@ def execute_query(query, params=(), fetchone=False, fetchall=False):
         return None
 
     try:
-        cursor = conn.cursor()
-        cursor.execute(query, params)
+        cur = conn.cursor()
+        cur.execute(query, params)
         conn.commit()
 
         if fetchone:
-            return cursor.fetchone()
+            return cur.fetchone()
         if fetchall:
-            return cursor.fetchall()
+            return cur.fetchall()
         return None
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Erro ao executar query: {e}")
+        conn.rollback()
         return None
     finally:
         conn.close()

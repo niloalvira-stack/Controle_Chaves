@@ -6,8 +6,36 @@
   <component name="ChangeListManager">
     <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="Backup do sistema Controle de Chaves">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/anexos.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/anexos.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/predios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/predios.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/salas.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/salas.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/usuarios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/usuarios.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/utilizadores_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/utilizadores_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/autenticacao.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/create_admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/create_admin.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/login_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/login_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autenticacao/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controle/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controle/movimentacoes.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/movimentacoes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database_init.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_init.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database_module.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_module.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_geral.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_geral.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_periodo_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_sala_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_geral_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_graficos.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_graficos.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/relatorios/relatorios_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorios_tab.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/utils_log.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils_log.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -71,6 +99,7 @@
     &quot;Python.Update_db.executor&quot;: &quot;Run&quot;,
     &quot;Python.__init__.executor&quot;: &quot;Run&quot;,
     &quot;Python._init_.executor&quot;: &quot;Run&quot;,
+    &quot;Python.anexos.executor&quot;: &quot;Run&quot;,
     &quot;Python.autenticacao.executor&quot;: &quot;Run&quot;,
     &quot;Python.create_admin.executor&quot;: &quot;Run&quot;,
     &quot;Python.dash_main.executor&quot;: &quot;Run&quot;,
@@ -92,6 +121,7 @@
     &quot;Python.test_janela.executor&quot;: &quot;Run&quot;,
     &quot;Python.test_log.executor&quot;: &quot;Run&quot;,
     &quot;Python.test_movimentcoes.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_pg_conn.executor&quot;: &quot;Run&quot;,
     &quot;Python.test_pyqyt.executor&quot;: &quot;Run&quot;,
     &quot;Python.teste.executor&quot;: &quot;Run&quot;,
     &quot;Python.teste_banco.executor&quot;: &quot;Run&quot;,
@@ -205,7 +235,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770997719105</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Backup do sistema Controle de Chaves">
+      <option name="closed" value="true" />
+      <created>1770998556025</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1770998556025</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -261,13 +299,22 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/controle/__init__.py</url>
-          <line>4</line>
+          <line>2</line>
           <option name="timeStamp" value="3" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/relatorios/relatorios_tab.py</url>
-          <line>24</line>
+          <line>25</line>
           <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/controle/movimentacoes.py</url>
+          <line>1</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <option name="timeStamp" value="11" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

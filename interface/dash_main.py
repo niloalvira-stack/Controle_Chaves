@@ -11,14 +11,17 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QMessageBox,
     QLabel,
-    QApplication,)
+    QApplication,
+)
 
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
+
 from admin.admin import AdminTab
 from admin.log_viewer_tab import LogViewerTab
-from autenticacao import session_manager
-from autenticacao.helpers_autenticacao import get_current_user, is_admin
+
+from autenticacao import session_manager, get_current_user, is_admin
+
 from config import (
     APP_NAME,
     APP_VERSION,
@@ -250,14 +253,14 @@ class DashMain(QMainWindow):
             else:
                 print("  Usuário não é admin; abas Administração/Logs ocultas.")
         except Exception as e:
-            print(f"ERRO ao verificar/admin abas: {e}")
+            import traceback
+            print("ERRO ao verificar/admin abas:", e)
+            traceback.print_exc()
             QMessageBox.warning(
                 self,
                 "Aviso",
                 f"Falha ao verificar permissões de administrador:\n{e}",
             )
-
-        print("Saindo de load_tabs()")
 
     # ===== Sobre / Logout / Sair =====
     def mostrar_sobre(self):
@@ -286,3 +289,7 @@ class DashMain(QMainWindow):
 
         # some sozinho após 4 segundos
         QTimer.singleShot(4000, self.feedback_label.hide)
+
+
+    def show_status_message(self, message):
+        self.show_operation_done(message)

@@ -9,7 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 
-from autenticacao.helpers_autenticacao import get_db_connection
+from database_module import get_connection
 
 
 def formatar_data_br(valor):
@@ -159,18 +159,26 @@ class RelatorioPorUsuarioTab(QWidget):
         self.cb_usuario.clear()
         self.cb_usuario.addItem("[Selecione um utilizador]", None)
 
-        conn = get_db_connection()
+        conn = get_connection()
+        if conn is None:
+            self.cb_usuario.blockSignals(False)
+            return
+
         c = conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT DISTINCT u.id, u.nome
             FROM utilizadores u
             JOIN movimentacoes m ON m.utilizador_id = u.id
             ORDER BY u.nome
-        """)
-        rows = c.fetchall()
+            """
+        )
+        rows = c.fetchall()  # RealDictRow
         conn.close()
 
-        for uid, nome in rows:
+        for row in rows:
+            uid = row["id"]
+            nome = row["nome"]
             self.cb_usuario.addItem(nome, uid)
 
         if usuario_id_atual is not None:
@@ -182,7 +190,6 @@ class RelatorioPorUsuarioTab(QWidget):
         self.cb_usuario.blockSignals(False)
 
     def _query_base(self):
-        # Mesma lógica de COALESCE de antes, adaptada para %s. [web:22][web:103]
         return """
             SELECT m.chave,
                    COALESCE(u.nome, m.usuario) AS utilizador,
@@ -205,13 +212,29 @@ class RelatorioPorUsuarioTab(QWidget):
             self._rows_cache = []
             return []
 
-        conn = get_db_connection()
+        conn = get_connection()
+        if conn is None:
+            self._rows_cache = []
+            return []
+
         cursor = conn.cursor()
         cursor.execute(self._query_base(), (usuario_id, usuario_nome))
-        rows = cursor.fetchall()
+        rows = cursor.fetchall()  # RealDictRow
         conn.close()
-        self._rows_cache = rows
-        return rows
+
+        dados = []
+        for row in rows:
+            r = [
+                row["chave"],
+                row["utilizador"],
+                row["status"],
+                row["data_retirada"],
+                row["data_retorno"],
+            ]
+            dados.append(r)
+
+        self._rows_cache = dados
+        return dados
 
     def load_relatorio(self):
         try:

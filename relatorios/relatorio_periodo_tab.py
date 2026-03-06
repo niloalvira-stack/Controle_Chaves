@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 
-from autenticacao.helpers_autenticacao import get_db_connection
+from database_module import get_connection
 
 
 def formatar_data_br(data_str):
@@ -157,7 +157,6 @@ class RelatorioPorPeriodoTab(QWidget):
         return inicio, fim
 
     def _query_base(self):
-        # Postgres, usando BETWEEN em timestamp (ok para esse uso pontual). [web:91]
         return """
             SELECT m.id,
                    m.chave,
@@ -173,13 +172,28 @@ class RelatorioPorPeriodoTab(QWidget):
 
     def _buscar_dados(self):
         inicio, fim = self._periodo()
-        conn = get_db_connection()
+        conn = get_connection()
+        if conn is None:
+            raise RuntimeError("Falha ao conectar ao banco de dados.")
         cursor = conn.cursor()
         cursor.execute(self._query_base(), (inicio, fim))
-        rows = cursor.fetchall()
+        rows = cursor.fetchall()  # RealDictRow
         conn.close()
-        self._rows_cache = rows
-        return rows
+
+        dados = []
+        for row in rows:
+            r = [
+                row["id"],
+                row["chave"],
+                row["utilizador"],
+                row["status"],
+                row["data_retirada"],
+                row["data_retorno"],
+            ]
+            dados.append(r)
+
+        self._rows_cache = dados
+        return dados
 
     def load_relatorio(self):
         try:
@@ -275,8 +289,10 @@ class RelatorioPorPeriodoTab(QWidget):
             )
 
             story = []
-            titulo = Paragraph(f"Relatório de Movimentações por Período<br/>{periodo_str}",
-                               getSampleStyleSheet()["Title"])
+            titulo = Paragraph(
+                f"Relatório de Movimentações por Período<br/>{periodo_str}",
+                getSampleStyleSheet()["Title"]
+            )
             story.append(titulo)
             story.append(Spacer(1, 12))
 

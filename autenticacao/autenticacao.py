@@ -1,40 +1,7 @@
 import bcrypt
 from PyQt5.QtWidgets import QMessageBox
-import psycopg2
-import psycopg2.extras
 
-# Config do Postgres – ajuste a senha se precisar
-DB_CONFIG = {
-    "database": "controle_chaves",
-    "user": "postgres",
-    "password": "123456",
-    "host": "localhost",
-    "port": "5432",
-}
-
-
-def execute_query(query, params=(), fetchone=False):
-    """
-    Executa query no PostgreSQL.
-    Retorna dict (RealDictCursor) se fetchone=True, lista de dicts se não.
-    """
-    conn = None
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(query, params)
-        conn.commit()
-        if fetchone:
-            return cur.fetchone()
-        return cur.fetchall()
-    except psycopg2.Error as e:
-        print(f"Erro ao executar query: {e}")
-        if conn:
-            conn.rollback()
-        return None
-    finally:
-        if conn:
-            conn.close()
+from database_module import get_connection, execute_query  # usa o módulo padrão de BD
 
 
 def create_user(login, nome, senha, is_admin=False):
@@ -44,13 +11,16 @@ def create_user(login, nome, senha, is_admin=False):
         VALUES (%s, %s, %s, %s, %s);
     """
     # primeiro_login TRUE no primeiro acesso, is_admin boolean
-    execute_query(query, (login, nome, senha_hash, True, bool(is_admin)))
+    execute_query(
+        query,
+        (login, nome, senha_hash, True, bool(is_admin)),
+    )
 
 
 def hash_password(password: str) -> str:
     """Gera o hash bcrypt da senha como string utf-8 para salvar no banco."""
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    return hashed.decode('utf-8')
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+    return hashed.decode("utf-8")
 
 
 def verify_password(stored_hash: str, password: str) -> bool:
@@ -60,8 +30,10 @@ def verify_password(stored_hash: str, password: str) -> bool:
     """
     if not stored_hash or not stored_hash.startswith("$2b$"):
         return False
-    stored_hash_bytes = stored_hash.encode('utf-8') if isinstance(stored_hash, str) else stored_hash
-    return bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes)
+    stored_hash_bytes = (
+        stored_hash.encode("utf-8") if isinstance(stored_hash, str) else stored_hash
+    )
+    return bcrypt.checkpw(password.encode("utf-8"), stored_hash_bytes)
 
 
 def get_user_by_login(login: str):
@@ -70,14 +42,14 @@ def get_user_by_login(login: str):
         FROM usuarios
         WHERE login = %s
     """
+    # usa execute_query do database_module, que já abre RealDictCursor
     result = execute_query(query, (login,), fetchone=True)
     if result:
-        # result já é dict por causa do RealDictCursor
         return {
             "id": result["id"],
             "login": result["login"],
             "nome": result["nome"],
-            "senha": result["senha_hash"],          # compatível com verify_password
+            "senha": result["senha_hash"],  # compatível com verify_password
             "primeiro_login": result["primeiro_login"],
             "is_admin": result["is_admin"],
         }
@@ -97,4 +69,4 @@ def show_warning(title: str, message: str):
     msg.setIcon(QMessageBox.Warning)
     msg.setWindowTitle(title)
     msg.setText(message)
-    msg.exec_()
+

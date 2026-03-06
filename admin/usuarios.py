@@ -18,7 +18,7 @@ class UsuarioDialog(QDialog):
         self.login_edit = QLineEdit(login)
         self.nome_edit = QLineEdit(nome)
 
-        admin_text = "Sim" if is_admin in (1, "1", True) else "Não"
+        admin_text = "Sim" if is_admin in (1, "1", True, "t") else "Não"
         self.admin_edit = QLineEdit(admin_text)
 
         self.primeiro_edit = QLineEdit(primeiro_login)
@@ -124,7 +124,6 @@ class UsuariosTab(QWidget):
         self.table.setRowCount(len(users))
         for row_idx, user in enumerate(users):
             print("DEBUG preenchendo linha", row_idx, "->", user)
-            # user é RealDictRow (dict)
             self.table.setItem(row_idx, 0, QTableWidgetItem(str(user["id"])))
             self.table.setItem(row_idx, 1, QTableWidgetItem(user["login"]))
             self.table.setItem(row_idx, 2, QTableWidgetItem(user["nome"]))
@@ -135,8 +134,6 @@ class UsuariosTab(QWidget):
             texto_primeiro = "Sim" if user["primeiro_login"] in (1, "1", True, "t") else "Não"
             self.table.setItem(row_idx, 4, QTableWidgetItem(texto_primeiro))
 
-
-
     def add_user(self):
         dialog = UsuarioDialog()
         if dialog.exec():
@@ -146,6 +143,12 @@ class UsuariosTab(QWidget):
                 QMessageBox.warning(self, "Erro", "Login e senha são obrigatórios.")
                 return
 
+            # converter flags para boolean
+            is_admin_bool = bool(dados["is_admin"])
+            primeiro_bool = (
+                True if str(dados["primeiro_login"]).strip().lower() == "sim" else False
+            )
+
             try:
                 hashed_pw = hash_password(dados["senha"])
                 conn = get_connection()
@@ -154,11 +157,16 @@ class UsuariosTab(QWidget):
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO usuarios (login, nome, is_admin, primeiro_login, senha_hash)
+                    INSERT INTO usuarios (login, nome, is_admin, primeiro_login, senha)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (dados["login"], dados["nome"], dados["is_admin"],
-                     dados["primeiro_login"], hashed_pw),
+                    (
+                        dados["login"],
+                        dados["nome"],
+                        is_admin_bool,
+                        primeiro_bool,
+                        hashed_pw,
+                    ),
                 )
                 conn.commit()
                 conn.close()
@@ -191,9 +199,8 @@ class UsuariosTab(QWidget):
         if conn is None:
             return
         cursor = conn.cursor()
-        cursor.execute("SELECT senha_hash FROM usuarios WHERE id=%s", (user_id,))
+        cursor.execute("SELECT senha FROM usuarios WHERE id=%s", (user_id,))
         senha_row = cursor.fetchone()
-        # senha_row será RealDictRow ou tupla conforme cursor_factory; aqui só precisamos do valor
         if isinstance(senha_row, dict):
             senha_atual = list(senha_row.values())[0] if senha_row else None
         else:
@@ -210,6 +217,12 @@ class UsuariosTab(QWidget):
             else:
                 hashed_pw = senha_atual
 
+            # converter flags para boolean
+            is_admin_bool = bool(dados["is_admin"])
+            primeiro_bool = (
+                True if str(dados["primeiro_login"]).strip().lower() == "sim" else False
+            )
+
             try:
                 conn = get_connection()
                 if conn is None:
@@ -218,14 +231,14 @@ class UsuariosTab(QWidget):
                 cursor.execute(
                     """
                     UPDATE usuarios
-                    SET login=%s, nome=%s, is_admin=%s, primeiro_login=%s, senha_hash=%s
+                    SET login=%s, nome=%s, is_admin=%s, primeiro_login=%s, senha=%s
                     WHERE id=%s
                     """,
                     (
                         dados["login"],
                         dados["nome"],
-                        dados["is_admin"],
-                        dados["primeiro_login"],
+                        is_admin_bool,
+                        primeiro_bool,
                         hashed_pw,
                         user_id,
                     ),

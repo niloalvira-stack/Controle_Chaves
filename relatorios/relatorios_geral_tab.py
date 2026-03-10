@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 
-from database_module import get_connection
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br(valor):
@@ -131,28 +131,13 @@ class RelatoriosGeralTab(QWidget):
         """
 
     def _buscar_dados(self):
-        conn = get_connection()
-        if conn is None:
-            self._rows_cache = []
-            return []
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(self._query_base())
-        rows = cursor.fetchall()  # RealDictRow
+        rows = cursor.fetchall()
         conn.close()
-
-        dados = []
-        for row in rows:
-            dados.append([
-                row["id"],
-                row["chave"],
-                row["utilizador"],
-                row["status"],
-                row["data_retirada"],
-                row["data_retorno"],
-            ])
-
-        self._rows_cache = dados
-        return dados
+        self._rows_cache = rows
+        return rows
 
     def load_relatorio(self):
         try:

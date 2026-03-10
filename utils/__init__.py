@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import QMessageBox
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def montar_display_sala_variavel(nome, predio, anexo=None):

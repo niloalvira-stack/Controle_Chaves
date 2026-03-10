@@ -6,7 +6,7 @@ from PyQt5.QtCore import QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from database_module import get_connection
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br_dia(valor):
@@ -18,6 +18,7 @@ def formatar_data_br_dia(valor):
         return datetime.strptime(valor, "%Y-%m-%d").strftime("%d%m%Y")
     except Exception:
         return str(valor)
+
 
 
 class RelatorioGraficosTab(QWidget):
@@ -41,13 +42,12 @@ class RelatorioGraficosTab(QWidget):
 
     def _buscar_dados(self):
         """
-        Quantidade de movimentações por dia (data_retirada).
+        Exemplo: quantidade de movimentações por dia (data_retirada).
+        Ajuste a query conforme o que você quiser mostrar no gráfico.
         """
-        conn = get_connection()
-        if conn is None:
-            return [], []
-
+        conn = get_db_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
             SELECT
                 DATE(data_retirada) AS dia,
@@ -57,11 +57,13 @@ class RelatorioGraficosTab(QWidget):
             GROUP BY DATE(data_retirada)
             ORDER BY DATE(data_retirada)
         """)
-        rows = cursor.fetchall()  # RealDictRow
+
+        rows = cursor.fetchall()
         conn.close()
 
-        dias = [row["dia"] for row in rows]
-        totais = [row["total"] for row in rows]
+        # Transforma em listas para plot
+        dias = [r[0] for r in rows]      # datetime.date
+        totais = [r[1] for r in rows]    # int
         return dias, totais
 
     def gerar_graficos(self):
@@ -77,6 +79,7 @@ class RelatorioGraficosTab(QWidget):
             ax.text(0.5, 0.5, "Sem dados de movimentações.",
                     ha="center", va="center", transform=ax.transAxes)
         else:
+            # Converte datas para rótulos no formato dd/mm/yyyy
             labels = [formatar_data_br_dia(d) for d in dias]
             x = range(len(dias))
 

@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QFileDialog, QMessageBox, QHeaderView,
-    QLabel, QComboBox
+    QProgressDialog, QLabel, QComboBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 import csv
@@ -13,8 +13,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet
 
-from database_module import get_connection
+from autenticacao.helpers_autenticacao import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +32,12 @@ class DatabaseLoader(QThread):
 
     def run(self):
         try:
-            conn = get_connection()
-            if conn is None:
-                self.error_occurred.emit("Falha ao conectar ao banco de dados.")
-                return
-
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute(self.query, self.params)
-            rows = cursor.fetchall()  # lista de RealDictRow
+            rows = cursor.fetchall()
             conn.close()
-
-            dados = []
-            for row in rows:
-                r = [
-                    row["id"],
-                    row["chave"],
-                    row["utilizador"],
-                    row["status"],
-                    row["data_retirada"],
-                    row["data_retorno"],
-                ]
-                dados.append(r)
-
-            self.data_loaded.emit(dados)
+            self.data_loaded.emit(rows)
         except Exception as e:
             self.error_occurred.emit(str(e))
 
@@ -182,6 +166,7 @@ class RelatorioGeralTab(QWidget):
 
     def _atualizar_query(self):
         """Chamado quando muda o combo de período (opcionalmente recarrega)."""
+        # Aqui você pode disparar load_relatorio automaticamente se quiser
         pass
 
     def load_relatorio(self):
@@ -206,12 +191,14 @@ class RelatorioGeralTab(QWidget):
 
         for i, row in enumerate(rows):
             for j, val in enumerate(row):
+                # formatação simples das datas
                 if j in (4, 5) and isinstance(val, datetime):
                     val = val.strftime("%d/%m/%Y %H:%M:%S")
                 item = QTableWidgetItem(str(val) if val is not None else "")
                 item.setTextAlignment(Qt.AlignCenter)
 
-                if j == 3:
+                # Cores por status (ajuste conforme seus valores reais de status)
+                if j == 3:  # Status
                     status_str = str(val).lower() if val else ""
                     if "indispon" in status_str:
                         item.setBackground(Qt.red)
@@ -238,26 +225,11 @@ class RelatorioGeralTab(QWidget):
         periodo = self.combo_periodo.currentText().upper().replace(" ", "_")
         query, params = self._query_base(periodo)
         try:
-            conn = get_connection()
-            if conn is None:
-                raise RuntimeError("Falha ao conectar ao banco de dados.")
-
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute(query, params)
-            rows = cursor.fetchall()
+            dados = cursor.fetchall()
             conn.close()
-
-            dados = []
-            for row in rows:
-                r = [
-                    row["id"],
-                    row["chave"],
-                    row["utilizador"],
-                    row["status"],
-                    row["data_retirada"],
-                    row["data_retorno"],
-                ]
-                dados.append(r)
             return dados
         except Exception as e:
             logger.error(f"Erro exportação: {e}")
@@ -288,6 +260,7 @@ class RelatorioGeralTab(QWidget):
                 writer.writerow(["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 for row in dados:
                     row = list(row)
+                    # datas (índices 4 e 5) se forem datetime
                     for idx in (4, 5):
                         if isinstance(row[idx], datetime):
                             row[idx] = row[idx].strftime("%d/%m/%Y %H:%M:%S")

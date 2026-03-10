@@ -11,7 +11,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 
 from utils import montar_display_sala_variavel, show_info, show_warning
-from database_module import get_connection
+from autenticacao.helpers_autenticacao import get_db_connection
 
 
 def formatar_data_br(data_str):
@@ -26,29 +26,20 @@ def formatar_data_br(data_str):
 
 
 def listar_salas_para_relatorio():
-    conn = get_connection()
-    if conn is None:
-        return []
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT s.nome, p.nome AS predio, a.nome AS anexo
+    cursor.execute("""
+        SELECT s.nome, p.nome, a.nome
         FROM salas s
         LEFT JOIN predios p ON s.predio_id = p.id
         LEFT JOIN anexos a ON s.anexo_id = a.id
         ORDER BY s.nome
-        """
-    )
-    rows = cursor.fetchall()  # RealDictRow
-    conn.close()
-
+    """)
     lista = []
-    for row in rows:
-        nome = row["nome"]
-        predio = row.get("predio")
-        anexo = row.get("anexo")
+    for nome, predio, anexo in cursor.fetchall():
         display = montar_display_sala_variavel(nome, predio, anexo)
         lista.append(display)
+    conn.close()
     return lista
 
 
@@ -106,9 +97,7 @@ class RelatorioPorSalaTab(QWidget):
         # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
-        )
+        self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -185,6 +174,7 @@ class RelatorioPorSalaTab(QWidget):
         return ini, fim
 
     def _query_base(self):
+        # Postgres com parâmetros %s. [web:23][web:92]
         return """
             SELECT m.chave,
                    COALESCE(u.nome, m.usuario) AS utilizador,
@@ -211,28 +201,13 @@ class RelatorioPorSalaTab(QWidget):
             return []
 
         data_ini, data_fim = self._get_periodo()
-        conn = get_connection()
-        if conn is None:
-            self._rows_cache = []
-            return []
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(self._query_base(), (chave, data_ini, data_fim))
-        rows = cursor.fetchall()  # RealDictRow
+        rows = cursor.fetchall()
         conn.close()
-
-        dados = []
-        for row in rows:
-            r = [
-                row["chave"],
-                row["utilizador"],
-                row["status"],
-                row["data_retirada"],
-                row["data_retorno"],
-            ]
-            dados.append(r)
-
-        self._rows_cache = dados
-        return dados
+        self._rows_cache = rows
+        return rows
 
     def load_relatorio(self):
         try:
@@ -273,24 +248,21 @@ class RelatorioPorSalaTab(QWidget):
 
         chave = self.cb_chave.currentText() or "sala"
         data_ini, data_fim = self._get_periodo()
-        nome_sugestao = (
-            f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.csv"
-        ).replace(" ", "_")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar CSV", nome_sugestao, "CSV Files (*.csv)"
-        )
+        nome_sugestao = f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.csv".replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", nome_sugestao,
+                                              "CSV Files (*.csv)")
         if not path:
             return
 
         try:
-            with open(path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f, delimiter=";")
+            with open(path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f, delimiter=';')
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 for row in self._rows_cache:
-                    linha = list(row)
-                    linha[3] = formatar_data_br(linha[3])  # retirada
-                    linha[4] = formatar_data_br(linha[4])  # devolução
-                    writer.writerow(linha)
+                    row = list(row)
+                    row[3] = formatar_data_br(row[3])  # retirada
+                    row[4] = formatar_data_br(row[4])  # devolução
+                    writer.writerow(row)
 
             dash = self._get_dash_main()
             if dash is not None:
@@ -311,19 +283,17 @@ class RelatorioPorSalaTab(QWidget):
 
         chave = self.cb_chave.currentText() or "sala"
         data_ini, data_fim = self._get_periodo()
-        nome_sugestao = (
-            f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.pdf"
-        ).replace(" ", "_")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar PDF", nome_sugestao, "PDF Files (*.pdf)"
-        )
+        nome_sugestao = f"relatorio_sala_{chave}_{data_ini[:10]}_a_{data_fim[:10]}.pdf".replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", nome_sugestao,
+                                              "PDF Files (*.pdf)")
         if not path:
             return
 
         try:
             cabecalho = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
             tabela_dados = [cabecalho]
-            for ch, utilizador, status, data_ret, data_dev in self._rows_cache:
+            for row in self._rows_cache:
+                ch, utilizador, status, data_ret, data_dev = row
                 tabela_dados.append([
                     ch or "",
                     utilizador or "",
@@ -349,7 +319,7 @@ class RelatorioPorSalaTab(QWidget):
             story = []
             titulo = Paragraph(
                 f"Relatório de Movimentações por Sala<br/>{chave}<br/>{periodo_str}",
-                getSampleStyleSheet()["Title"],
+                getSampleStyleSheet()["Title"]
             )
             story.append(titulo)
             story.append(Spacer(1, 12))
@@ -373,7 +343,6 @@ class RelatorioPorSalaTab(QWidget):
 
             dash = self._get_dash_main()
             if dash is not None:
-                show_info("Sucesso", "Exportação PDF por sala concluída.")
                 dash.show_status_message("Exportação PDF por sala concluída.")
             else:
                 show_info("Sucesso", "Exportação PDF concluída.")

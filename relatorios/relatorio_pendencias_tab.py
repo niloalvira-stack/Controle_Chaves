@@ -1,27 +1,20 @@
-import sys
-import locale
-
-# Tenta ajustar locale; se não existir no sistema, apenas ignora
-try:
-    locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
-except locale.Error:
-    pass
-
-# Em app GUI congelado (PyInstaller --windowed), stdout pode ser None
-stdout = getattr(sys, "stdout", None)
-if stdout is not None and hasattr(stdout, "reconfigure"):
-    stdout.reconfigure(encoding="utf-8")
-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QMessageBox, QHeaderView,
+    QTableWidgetItem, QFileDialog, QMessageBox, QHeaderView,
     QLabel, QProgressBar
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal, QDateTime
+import csv
 import logging
 from datetime import datetime
 
-from database_module import get_connection
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+
+from autenticacao.helpers_autenticacao import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +39,9 @@ class PendenciasLoader(QThread):
 
     def run(self):
         try:
-            conn = get_connection()
-            if conn is None:
-                self.error_occurred.emit("Falha ao conectar ao banco de dados.")
-                return
-
+            conn = get_db_connection()
             cursor = conn.cursor()
-            # removido o acento de 'indisponivel' para evitar problema de encoding
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT
                     m.chave,
                     COALESCE(u.nome, m.usuario) AS utilizador,
@@ -64,27 +51,14 @@ class PendenciasLoader(QThread):
                     m.id
                 FROM movimentacoes m
                 LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-                WHERE m.status = 'indisponivel'
+                WHERE m.status = 'indisponível'
                 ORDER BY m.data_retirada ASC
-                """
-            )
+            """)
             rows = cursor.fetchall()
             conn.close()
 
-            dados = []
-            for row in rows:
-                r = [
-                    row["chave"],
-                    row["utilizador"],
-                    row["status"],
-                    row["data_retirada"],
-                    row["data_retorno"],
-                    row["id"],
-                ]
-                dados.append(r)
-
-            total = len(dados)
-            self.data_loaded.emit(dados, total)
+            total = len(rows)
+            self.data_loaded.emit(rows, total)
 
         except Exception as e:
             logger.exception("Erro ao carregar pendências")

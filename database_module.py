@@ -1,31 +1,24 @@
-import base64
 import psycopg2
 import psycopg2.extras
 from utils.config_app import get_db_config
 
 
-def _decode_password(password_b64: str) -> str:
-    return base64.b64decode(password_b64).decode("utf-8")
-
-
 def get_connection():
     """
-    Abre conexão com PostgreSQL usando os dados do config.ini
-    (senha em base64) e cursor como RealDictCursor.
+    Abre conexão com PostgreSQL usando os dados do config.ini.
     """
     cfg = get_db_config()
 
     try:
-        password = _decode_password(cfg["password_b64"])
-
         conn = psycopg2.connect(
             host=cfg["host"],
             port=cfg["port"],
             dbname=cfg["database"],
             user=cfg["user"],
-            password=password,
-            cursor_factory=psycopg2.extras.RealDictCursor,
+            password=cfg["password"],
         )
+        # Devolve linhas como dict (similar ao sqlite3.Row)
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
         return conn
     except psycopg2.Error as e:
         print(f"Erro ao conectar no banco de dados: {e}")

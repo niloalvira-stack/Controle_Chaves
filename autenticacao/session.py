@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
 
-from database_module import execute_query
+from autenticacao.autenticacao import execute_query
 from utils.utils_log import log_acao
 
 
@@ -33,6 +33,11 @@ class SessionManager:
         e preenche a sessão global, incluindo o flag is_admin.
         """
         try:
+            print("DEBUG SessionManager.login: login recebido =", login, type(login))
+            if isinstance(login, bytes):
+                login = login.decode("utf-8", errors="ignore")
+                print("DEBUG SessionManager.login: login convertido =", login, type(login))
+
             sql = """
                 SELECT id, login, nome, is_admin
                 FROM usuarios
@@ -47,8 +52,7 @@ class SessionManager:
             log_acao(f"Tentativa de login com usuário inexistente na sessão: '{login}'")
             return False
 
-        # execute_query com RealDictCursor já retorna dict
-        user = dict(row)
+        user = row  # já é dict
         is_admin_flag = bool(user.get("is_admin", False))
 
         self.current_user = SessionUser(
@@ -106,8 +110,8 @@ session_manager = SessionManager()
 # Funções de atalho usadas pelo resto da aplicação
 def validar_login(login: str) -> bool:
     """
-    Função de atalho usada pela tela de login.
-    Apenas delega para session_manager.login(login).
+    Versão simples: só verifica se o login existe e carrega a sessão.
+    Se você precisar validar senha aqui também, pode adaptar.
     """
     return session_manager.login(login)
 

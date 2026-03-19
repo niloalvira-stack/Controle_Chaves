@@ -1,4 +1,5 @@
-import os
+# controle/selecionar_sala_dialog.py
+
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QLineEdit, QLabel, QHeaderView, QDialogButtonBox, QMessageBox
@@ -6,7 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 
-from autenticacao.helpers_autenticacao import get_db_connection
+from database_module import get_connection  # usa o mesmo módulo oficial
 
 
 class SelecionarSalaDialog(QDialog):
@@ -65,38 +66,71 @@ class SelecionarSalaDialog(QDialog):
     def _carregar_salas(self):
         self.table.setRowCount(0)
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT s.id, s.nome, p.nome, a.nome, s.status
-            FROM salas s
-            LEFT JOIN predios p ON s.predio_id = p.id
-            LEFT JOIN anexos a ON s.anexo_id = a.id
-            ORDER BY s.nome
-        """)
-        rows = cursor.fetchall()
-        conn.close()
+        try:
+            conn = get_connection()
+            if conn is None:
+                QMessageBox.critical(self, "Erro", "Falha ao conectar ao banco de dados.")
+                return
 
-        for sid, nome, predio, anexo, status in rows:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT s.id,
+                       s.nome,
+                       p.nome AS predio_nome,
+                       a.nome AS anexo_nome,
+                       s.status
+                FROM salas s
+                LEFT JOIN predios p ON s.predio_id = p.id
+                LEFT JOIN anexos a ON s.anexo_id = a.id
+                ORDER BY s.nome
+                """
+            )
+            rows = cursor.fetchall()
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar salas:\n{e}")
+            return
 
-            # Sala: apenas o nome
+        # rows: lista de tuplas (id, nome, predio_nome, anexo_nome, status)
+        for row in rows:
+            sid, nome, predio, anexo, status = row
+
+            # converte bytes -> str
+            if isinstance(nome, (bytes, bytearray)):
+                nome = nome.decode("utf-8", errors="ignore")
+            if isinstance(predio, (bytes, bytearray)):
+                predio = predio.decode("utf-8", errors="ignore")
+            if isinstance(anexo, (bytes, bytearray)):
+                anexo = anexo.decode("utf-8", errors="ignore")
+            if isinstance(status, (bytes, bytearray)):
+                status = status.decode("utf-8", errors="ignore")
+
+            status = status or ""
+
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+
             item_sala = QTableWidgetItem(nome or "")
-            item_sala.setData(Qt.UserRole, sid)  # guarda o id da sala
-            self.table.setItem(row, 0, item_sala)
+            item_sala.setData(Qt.UserRole, sid)
+            self.table.setItem(r, 0, item_sala)
 
-            # Prédio e Anexo em colunas separadas
-            self.table.setItem(row, 1, QTableWidgetItem(predio or ""))
-            self.table.setItem(row, 2, QTableWidgetItem(anexo or ""))
+            self.table.setItem(r, 1, QTableWidgetItem(predio or ""))
+            self.table.setItem(r, 2, QTableWidgetItem(anexo or ""))
 
-            # Status com cor
-            item_status = QTableWidgetItem(status or "")
+            item_status = QTableWidgetItem(status)
+
             if status == "disponivel":
+                # verde
                 item_status.setBackground(QBrush(QColor(144, 238, 144)))
             elif status == "indisponivel":
+                # amarelo
+                item_status.setBackground(QBrush(QColor(255, 215, 0)))
+            elif status == "atrasado":
+                # vermelho
                 item_status.setBackground(QBrush(QColor(255, 120, 120)))
-            self.table.setItem(row, 3, item_status)
+
+            self.table.setItem(r, 3, item_status)
 
     def _capturar_linhas(self):
         """
@@ -104,11 +138,19 @@ class SelecionarSalaDialog(QDialog):
         """
         dados = []
         for row in range(self.table.rowCount()):
-            sala = self.table.item(row, 0).text()
-            predio = self.table.item(row, 1).text()
-            anexo = self.table.item(row, 2).text()
-            status = self.table.item(row, 3).text()
-            sid = self.table.item(row, 0).data(Qt.UserRole)
+            sala_item = self.table.item(row, 0)
+            predio_item = self.table.item(row, 1)
+            anexo_item = self.table.item(row, 2)
+            status_item = self.table.item(row, 3)
+
+            if not sala_item:
+                continue
+
+            sala = sala_item.text()
+            predio = predio_item.text() if predio_item else ""
+            anexo = anexo_item.text() if anexo_item else ""
+            status = status_item.text() if status_item else ""
+            sid = sala_item.data(Qt.UserRole)
             dados.append((sala, predio, anexo, status, sid))
         return dados
 
@@ -120,22 +162,26 @@ class SelecionarSalaDialog(QDialog):
                 texto in sala.lower() or
                 texto in (predio or "").lower() or
                 texto in (anexo or "").lower()):
-                row = self.table.rowCount()
-                self.table.insertRow(row)
+                r = self.table.rowCount()
+                self.table.insertRow(r)
 
                 item_sala = QTableWidgetItem(sala)
                 item_sala.setData(Qt.UserRole, sid)
-                self.table.setItem(row, 0, item_sala)
+                self.table.setItem(r, 0, item_sala)
 
-                self.table.setItem(row, 1, QTableWidgetItem(predio))
-                self.table.setItem(row, 2, QTableWidgetItem(anexo))
+                self.table.setItem(r, 1, QTableWidgetItem(predio or ""))
+                self.table.setItem(r, 2, QTableWidgetItem(anexo or ""))
 
-                item_status = QTableWidgetItem(status)
+                item_status = QTableWidgetItem(status or "")
+
                 if status == "disponivel":
                     item_status.setBackground(QBrush(QColor(144, 238, 144)))
                 elif status == "indisponivel":
+                    item_status.setBackground(QBrush(QColor(255, 215, 0)))
+                elif status == "atrasado":
                     item_status.setBackground(QBrush(QColor(255, 120, 120)))
-                self.table.setItem(row, 3, item_status)
+
+                self.table.setItem(r, 3, item_status)
 
     def _pegar_selecao(self):
         selected = self.table.selectedItems()

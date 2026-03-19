@@ -1,6 +1,6 @@
 # controle/movimentacoes.py
 import csv
-from datetime import datetime
+from datetime import datetime, date  # adiciona date
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
@@ -13,23 +13,92 @@ from PyQt5.QtGui import QBrush, QColor
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from utils.ui_colors import aplicar_cor_status_item_generico
 from utils.validacao import email_valido
 from utils.utils import montar_display_sala_por_id
 from utils.utils_log import log_acao
 from .selecionar_sala_dialog import SelecionarSalaDialog
 from autenticacao.helpers_autenticacao import get_db_connection
 from autenticacao import get_current_user
+import config
 
 ALERTA_HORAS = 6
+
+
+def pode_solicitar_retirada(utilizador_id: int):
+    """
+    Verifica se o utilizador pode solicitar retirada:
+    - precisa estar ativo
+    - se vinculo != 'Servidor' e tiver data_fim_validade, não pode estar vencida
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT vinculo, data_fim_validade, ativo
+        FROM utilizadores
+        WHERE id = %s
+    """, (utilizador_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return False, "Utilizador não encontrado."
+
+    vinculo, data_fim, ativo = row
+
+    if not ativo:
+        return False, "Utilizador inativo. Contate o administrador."
+
+    # Servidor não tem limite de validade
+    if vinculo == "Servidor" or data_fim is None:
+        return True, ""
+
+    hoje = date.today()
+    if hoje > data_fim:
+        return False, f"Validade expirada em {data_fim.strftime('%d/%m/%Y')}. Contate o administrador."
+
+    return True, ""
+
+
+def aplicar_cor_status_item(item, status, retirada_val, now):
+    """
+    (mantida só por compatibilidade; não está sendo usada)
+    """
+    status = (status or "").strip()
+
+    try:
+        if status == "disponível":
+            cor_hex = config.COLOR_STATUS_DISPONIVEL
+
+        elif status == "indisponível":
+            atraso = False
+            if retirada_val:
+                try:
+                    if isinstance(retirada_val, datetime):
+                        retirada_dt = retirada_val
+                    else:
+                        retirada_dt = datetime.strptime(str(retirada_val), "%Y-%m-%d %H:%M:%S")
+                    diff_horas = (now - retirada_dt).total_seconds() / 3600
+                    atraso = diff_horas >= ALERTA_HORAS
+                except Exception:
+                    atraso = False
+
+            cor_hex = config.COLOR_STATUS_ATRASO if atraso else config.COLOR_STATUS_INDISPONIVEL
+        else:
+            return
+
+        item.setBackground(QBrush(QColor(cor_hex)))
+    except Exception:
+        pass
 
 
 def formatar_data_br(data_str):
     if not data_str:
         return ""
     try:
-        return datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
+        return datetime.strptime(str(data_str), "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
     except Exception:
-        return data_str
+        return str(data_str)
 
 
 class FiltroMovimentacaoDialog(QDialog):
@@ -50,6 +119,7 @@ class FiltroMovimentacaoDialog(QDialog):
         self.input_usuario.setPlaceholderText("Qualquer utilizador (opcional)")
 
         self.combo_status = QComboBox()
+        # UI continua com acento
         self.combo_status.addItems(["Todos", "disponível", "indisponível"])
 
         layout.addRow("Data Início:", self.data_inicio)
@@ -71,6 +141,13 @@ class FiltroMovimentacaoDialog(QDialog):
         status = self.combo_status.currentText()
         if status == "Todos":
             status = None
+        else:
+            # normalizar para o valor do banco
+            s = status.strip().lower()
+            if s in ("disponível", "disponivel"):
+                status = "disponivel"
+            elif s in ("indisponível", "indisponivel"):
+                status = "indisponivel"
         return {"data_ini": inicio, "data_fim": fim, "usuario": usuario, "status": status}
 
 
@@ -78,16 +155,26 @@ def listar_movimentacoes():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT m.id,
-               m.chave,
-               COALESCE(u.nome, m.usuario) AS utilizador,
-               COALESCE(m.email, u.email) AS email,
-               m.data_retirada,
-               m.data_retorno,
-               m.status
+        SELECT
+               m.id,                  -- 0
+               m.chave,               -- 1 Chave
+               s.descricao,           -- 2 Descrição sala
+               COALESCE(u.nome, m.usuario) AS utilizador,  -- 3 Utilizador
+               u.vinculo,             -- 4 Vínculo
+               m.data_retirada,       -- 5 Retirada
+               m.data_retorno,        -- 6 Devolução
+               m.status               -- 7 Status
         FROM movimentacoes m
         LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-        ORDER BY m.data_retirada DESC
+        LEFT JOIN salas s ON s.id = m.sala_id
+        ORDER BY
+            m.chave,
+            s.descricao,
+            utilizador,
+            u.vinculo,
+            m.data_retirada,
+            m.data_retorno,
+            m.status
     """)
     rows = cursor.fetchall()
     conn.close()
@@ -98,15 +185,18 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
-        SELECT m.id,
-               m.chave,
-               COALESCE(u.nome, m.usuario) AS utilizador,
-               COALESCE(m.email, u.email) AS email,
-               m.data_retirada,
-               m.data_retorno,
-               m.status
+        SELECT
+               m.id,                  -- 0
+               m.chave,               -- 1 Chave
+               s.descricao,           -- 2 Descrição sala
+               COALESCE(u.nome, m.usuario) AS utilizador,  -- 3 Utilizador
+               u.vinculo,             -- 4 Vínculo
+               m.data_retirada,       -- 5 Retirada
+               m.data_retorno,        -- 6 Devolução
+               m.status               -- 7 Status
         FROM movimentacoes m
         LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+        LEFT JOIN salas s ON s.id = m.sala_id
         WHERE 1=1
     """
     params = []
@@ -124,9 +214,20 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
         query += " AND (m.data_retirada <= %s)"
         params.append(data_fim)
     if status and status.lower() not in ["todos", ""]:
+        # aqui status já vem normalizado para 'disponivel' ou 'indisponivel'
         query += " AND m.status = %s"
         params.append(status)
-    query += " ORDER BY m.data_retirada DESC"
+
+    query += """
+        ORDER BY
+            m.chave,
+            s.descricao,
+            utilizador,
+            u.vinculo,
+            m.data_retirada,
+            m.data_retorno,
+            m.status
+    """
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
@@ -157,14 +258,16 @@ def registrar_retirada(sala_id, chave_display, utilizador_id, email):
         conn.close()
         raise ValueError(f"Utilizador id={utilizador_id} não possui nome válido")
 
+    status = "indisponivel"  # valor compatível com CHECK do banco
+
     cursor.execute(
         """
         INSERT INTO movimentacoes (
-            chave, utilizador_id, usuario, email, data_retirada, status, alerta_enviado
+            chave, sala_id, utilizador_id, usuario, email, data_retirada, status, alerta_enviado
         )
-        VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+        VALUES (%s,   %s,      %s,           %s,      %s,    %s,            %s,    FALSE)
         """,
-        (chave_display, utilizador_id, nome_utilizador, email, data_retirada, "indisponível")
+        (chave_display, sala_id, utilizador_id, nome_utilizador, email, data_retirada, status)
     )
 
     cursor.execute(
@@ -181,9 +284,11 @@ def registrar_devolucao(mov_id, chave, sala_id):
     cursor = conn.cursor()
     data_retorno = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    status = "disponivel"  # valor compatível com CHECK do banco
+
     cursor.execute(
-        "UPDATE movimentacoes SET data_retorno=%s, status='disponível' WHERE id=%s AND chave=%s",
-        (data_retorno, mov_id, chave)
+        "UPDATE movimentacoes SET data_retorno=%s, status=%s WHERE id=%s AND chave=%s",
+        (data_retorno, status, mov_id, chave)
     )
 
     cursor.execute(
@@ -205,7 +310,6 @@ class MovimentacoesTab(QWidget):
         print("UI criada")
 
         try:
-            # Assumindo que as tabelas já existem no Postgres (sem criar aqui)
             self.carregar_movimentacoes()
             print("Movimentações carregadas")
         except Exception as e:
@@ -224,7 +328,7 @@ class MovimentacoesTab(QWidget):
         self.timer.start(5000)
 
     def _get_dash_main(self):
-        from interface.dash_main import DashMain  # import local, evita ciclo
+        from interface.dash_main import DashMain
         janela = self.parentWidget()
         while janela is not None and not isinstance(janela, DashMain):
             janela = janela.parentWidget()
@@ -303,79 +407,98 @@ class MovimentacoesTab(QWidget):
 
         layout.addLayout(filter_btn_box)
 
+        # cria o QTableWidget antes de configurar
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"]
+            ["ID", "Chave", "Descrição sala", "Utilizador", "Vínculo", "Retirada", "Devolução", "Status"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setColumnHidden(0, True)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
 
-        self.setStyleSheet("""
-            QPushButton {
+        self.setStyleSheet(f"""
+            QPushButton {{
                 padding: 10px 24px;
                 min-height: 34px;
                 min-width: 140px;
                 border-radius: 6px;
                 border: 1px solid #888;
                 font-weight: 500;
-            }
-            QPushButton#btnEscolherSala {
+            }}
+            QPushButton#btnEscolherSala {{
                 background-color: #eeeeee;
-            }
-            QPushButton#btnEscolherSala:hover {
+            }}
+            QPushButton#btnEscolherSala:hover {{
                 background-color: #f5f5f5;
-            }
+            }}
 
-            QPushButton#btnRetirar {
-                background-color: #2e7d32;
-                color: white;
+            QPushButton#btnRetirar {{
+                background-color: {config.COLOR_BTN_VERDE};
+                color: {config.COLOR_BTN_TEXTO};
                 border: 1px solid #1b5e20;
-            }
-            QPushButton#btnRetirar:hover {
+            }}
+            QPushButton#btnRetirar:hover {{
                 background-color: #388e3c;
-            }
-            QPushButton#btnRetirar:pressed {
+            }}
+            QPushButton#btnRetirar:pressed {{
                 background-color: #1b5e20;
-            }
+            }}
 
-            QPushButton#btnDevolver {
-                background-color: #1565c0;
-                color: white;
+            QPushButton#btnDevolver {{
+                background-color: {config.COLOR_BTN_AZUL};
+                color: {config.COLOR_BTN_TEXTO};
                 border: 1px solid #0d47a1;
-            }
-            QPushButton#btnDevolver:hover {
+            }}
+            QPushButton#btnDevolver:hover {{
                 background-color: #1976d2;
-            }
-            QPushButton#btnDevolver:pressed {
+            }}
+            QPushButton#btnDevolver:pressed {{
                 background-color: #0d47a1;
-            }
+            }}
 
-            QPushButton#btnFiltrar, QPushButton#btnVerificarPendencias {
-                background-color: #f9a825;
-                color: #333333;
+            QPushButton#btnFiltrar, QPushButton#btnVerificarPendencias {{
+                background-color: {config.COLOR_BTN_LARANJA};
+                color: {config.COLOR_BTN_TEXTO_ESCURO};
                 border: 1px solid #f57f17;
-            }
-            QPushButton#btnFiltrar:hover, QPushButton#btnVerificarPendencias:hover {
+            }}
+            QPushButton#btnFiltrar:hover, QPushButton#btnVerificarPendencias:hover {{
                 background-color: #fbc02d;
-            }
-            QPushButton#btnFiltrar:pressed, QPushButton#btnVerificarPendencias:pressed {
+            }}
+            QPushButton#btnFiltrar:pressed, QPushButton#btnVerificarPendencias:pressed {{
                 background-color: #f57f17;
-            }
+            }}
         """)
 
         self.load_utilizadores_combo()
 
+    def abrir_dialogo_salas(self):
+        dlg = SelecionarSalaDialog(self)
+        result = dlg.exec()
+        if result != QDialog.Accepted:
+            return
+
+        sala_id = dlg.sala_id_selecionada
+        sala_display = dlg.sala_display_selecionada
+
+        if sala_id is None or not sala_display:
+            QMessageBox.warning(self, "Atenção", "Nenhuma sala foi selecionada.")
+            return
+
+        self.sala_id_atual = sala_id
+        self.label_sala_selecionada.setText(sala_display)
+
     def load_utilizadores_combo(self):
         self.combo_utilizador.clear()
+
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, nome, email
+            SELECT id, COALESCE(nome, '') AS nome, COALESCE(email, '') AS email
             FROM utilizadores
             WHERE ativo = TRUE
             ORDER BY nome
@@ -384,8 +507,17 @@ class MovimentacoesTab(QWidget):
         conn.close()
 
         self.combo_utilizador.addItem("Selecione o utilizador...", None)
-        for uid, nome, email in rows:
-            display = f"{nome} ({email})" if email else nome
+
+        for row in rows:
+            uid = row[0]
+            nome = row[1] or ""
+            email = row[2] or ""
+
+            if email:
+                display = f"{nome} ({email})"
+            else:
+                display = nome
+
             self.combo_utilizador.addItem(display, uid)
 
     def cadastrar_utilizador_rapido(self):
@@ -410,10 +542,8 @@ class MovimentacoesTab(QWidget):
                 )
                 conn.commit()
 
-                # recuperar id (em psycopg2 pode usar RETURNING se preferir)
                 cur.execute("SELECT currval(pg_get_serial_sequence('utilizadores','id'))")
                 novo_id = cur.fetchone()[0]
-
                 conn.close()
 
                 self.load_utilizadores_combo()
@@ -423,24 +553,28 @@ class MovimentacoesTab(QWidget):
                         break
 
                 dash = self._get_dash_main()
+                if dash is not None and getattr(dash, "util_tab", None) is not None:
+                    try:
+                        dash.util_tab.load_utilizadores()
+                    except Exception:
+                        pass
+
                 if dash is not None:
                     dash.show_operation_done("Utilizador cadastrado")
 
             except Exception as e:
                 QMessageBox.critical(self, "Erro", f"Erro ao cadastrar utilizador:\n{e}")
 
-    def abrir_dialogo_salas(self):
-        dlg = SelecionarSalaDialog(self)
-        if dlg.exec():
-            self.sala_id_atual = dlg.sala_id_selecionada
-            self.label_sala_selecionada.setText(dlg.sala_display_selecionada)
-
     def abrir_filtro_modal(self):
         dialog = FiltroMovimentacaoDialog(self)
         if dialog.exec():
             filtros = dialog.get_filters()
             resultados = buscar_movimentacoes_personalizado(
-                None, filtros["usuario"], filtros["data_ini"], filtros["data_fim"], filtros["status"]
+                None,
+                filtros["usuario"],
+                filtros["data_ini"],
+                filtros["data_fim"],
+                filtros["status"],
             )
             self.exibir_historico(resultados)
 
@@ -456,29 +590,24 @@ class MovimentacoesTab(QWidget):
             self.table.insertRow(row_idx)
 
             for col_idx, value in enumerate(row_data):
-                if col_idx in [4, 5]:
+                if isinstance(value, (bytes, bytearray)):
+                    value = value.decode("utf-8", errors="ignore")
+
+                # datas agora são colunas 5 (retirada) e 6 (devolução)
+                if col_idx in [5, 6]:
                     value = formatar_data_br(value)
 
-                item = QTableWidgetItem(str(value if value else ""))
+                texto = value if value is not None else ""
+                item = QTableWidgetItem(str(texto))
 
-                if col_idx == 6:
-                    status = row_data[6] or ""
-                    if status == "disponível":
-                        item.setBackground(QBrush(QColor(144, 238, 144)))
-                    elif status == "indisponível":
-                        retirada_str = row_data[4]
-                        try:
-                            if retirada_str:
-                                retirada_dt = datetime.strptime(retirada_str, "%Y-%m-%d %H:%M:%S")
-                                diff_horas = (now - retirada_dt).total_seconds() / 3600
-                                if diff_horas >= ALERTA_HORAS:
-                                    item.setBackground(QBrush(QColor(255, 120, 120)))
-                                else:
-                                    item.setBackground(QBrush(QColor(255, 215, 0)))
-                            else:
-                                item.setBackground(QBrush(QColor(255, 215, 0)))
-                        except Exception:
-                            item.setBackground(QBrush(QColor(255, 215, 0)))
+                if col_idx == 7:  # status
+                    status = row_data[7]
+                    if isinstance(status, (bytes, bytearray)):
+                        status = status.decode("utf-8", errors="ignore")
+
+                    retirada_val = row_data[5]  # cru do banco
+                    retorno_val = row_data[6]  # cru do banco
+                    aplicar_cor_status_item_generico(item, status, retirada_val, retorno_val, now)
 
                 self.table.setItem(row_idx, col_idx, item)
 
@@ -512,6 +641,19 @@ class MovimentacoesTab(QWidget):
             )
             return
 
+        # valida regra de validade por data (todos exceto Servidor)
+        ok, msg = pode_solicitar_retirada(utilizador_id)
+        if not ok:
+            QMessageBox.warning(self, "Bloqueado", msg)
+            log_acao(
+                action="retirada",
+                user=user_login,
+                resource=f"sala_id={sala_id}",
+                status="warning",
+                details=f"Bloqueado por validade: utilizador_id={utilizador_id}, motivo='{msg}'",
+            )
+            return
+
         if email and not email_valido(email):
             QMessageBox.warning(self, "Erro", "Informe um e-mail válido.")
             log_acao(
@@ -520,6 +662,37 @@ class MovimentacoesTab(QWidget):
                 resource=f"sala_id={sala_id}",
                 status="error",
                 details=f"E-mail inválido; utilizador_id={utilizador_id}, email='{email}'",
+            )
+            return
+
+        # impede retirar a mesma chave se já houver movimentação em aberto
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id
+            FROM movimentacoes
+            WHERE sala_id = %s
+              AND status = 'indisponivel'
+              AND data_retorno IS NULL
+            ORDER BY data_retirada DESC
+            LIMIT 1
+        """, (sala_id,))
+        mov_aberta = cur.fetchone()
+        conn.close()
+
+        if mov_aberta:
+            QMessageBox.warning(
+                self,
+                "Chave já retirada",
+                "Já existe uma retirada em aberto para esta chave/sala.\n"
+                "Efetue a devolução antes de registrar nova retirada."
+            )
+            log_acao(
+                action="retirada",
+                user=user_login,
+                resource=f"sala_id={sala_id}",
+                status="warning",
+                details=f"Tentativa de retirada com movimentação em aberto; utilizador_id={utilizador_id}",
             )
             return
 
@@ -572,51 +745,52 @@ class MovimentacoesTab(QWidget):
         user_login = user["login"] if user else "desconhecido"
 
         if not selected:
-            QMessageBox.warning(self, "Atenção", "Selecione uma movimentação para registrar devolução!")
+            QMessageBox.warning(self, "Atencao", "Selecione uma movimentacao para registrar devolucao!")
             log_acao(
                 action="devolucao",
-                user=user_login,
+                user=str(user_login),
                 status="error",
-                details="Tentativa de devolução sem seleção na tabela",
+                details="Tentativa de devolucao sem selecao na tabela",
             )
             return
 
         row = selected[0].row()
         item_id = self.table.item(row, 0)
         if not item_id or not item_id.text().strip().isdigit():
-            QMessageBox.warning(self, "Erro", "Registro selecionado não possui ID válido.")
+            QMessageBox.warning(self, "Erro", "Registro selecionado nao possui ID valido.")
             log_acao(
                 action="devolucao",
-                user=user_login,
+                user=str(user_login),
                 status="error",
-                details="Tentativa de devolução em linha sem ID válido",
+                details="Tentativa de devolucao em linha sem ID valido",
             )
             return
 
         mov_id = int(item_id.text().strip())
         chave_nome = self.table.item(row, 1).text()
-        status = self.table.item(row, 6).text()
+        status = self.table.item(row, 7).text()
 
-        if status == "disponível":
-            QMessageBox.information(self, "Info", "Esta movimentação já está devolvida!")
+        # aceita com e sem acento na UI
+        if status.strip().lower() in ("disponível", "disponivel"):
+            QMessageBox.information(self, "Info", "Esta movimentacao ja esta devolvida!")
             log_acao(
                 action="devolucao",
-                user=user_login,
-                resource=chave_nome,
+                user=str(user_login),
+                resource=str(chave_nome),
                 status="warning",
-                details=f"Tentativa de devolução já devolvida; mov_id={mov_id}",
+                details=f"Tentativa de devolucao ja devolvida; mov_id={mov_id}",
             )
             return
 
         sala_id = self._obter_sala_id_por_display(chave_nome)
         if sala_id is None:
-            QMessageBox.critical(self, "Erro", "Não foi possível localizar a sala desta movimentação.")
+            QMessageBox.critical(self, "Erro", "Nao foi possivel localizar a sala desta movimentacao.")
             log_acao(
                 action="devolucao",
-                user=user_login,
-                resource=chave_nome,
+                user=str(user_login),
+                resource=str(chave_nome),
                 status="error",
-                details=f"Erro ao localizar sala para devolução; mov_id={mov_id}",
+                details=f"Erro ao localizar sala para devolucao; mov_id={mov_id}",
             )
             return
 
@@ -624,8 +798,8 @@ class MovimentacoesTab(QWidget):
             registrar_devolucao(mov_id, chave_nome, sala_id)
             log_acao(
                 action="devolucao",
-                user=user_login,
-                resource=chave_nome,
+                user=str(user_login),
+                resource=str(chave_nome),
                 status="success",
                 details=f"mov_id={mov_id}",
             )
@@ -634,16 +808,29 @@ class MovimentacoesTab(QWidget):
 
             dash = self._get_dash_main()
             if dash is not None:
-                dash.show_operation_done("Devolução registrada!")
+                dash.show_operation_done("Devolucao registrada!")
         except Exception as e:
-            log_acao(
-                action="devolucao",
-                user=user_login,
-                resource=chave_nome,
-                status="error",
-                details=f"Erro ao registrar devolução: mov_id={mov_id}, erro={e}",
+            try:
+                raw_msg = getattr(e, "pgerror", None) or str(e)
+            except Exception:
+                raw_msg = "erro desconhecido"
+
+            try:
+                log_acao(
+                    action="devolucao",
+                    user=str(user_login),
+                    resource=str(chave_nome),
+                    status="error",
+                    details=f"Erro ao registrar devolucao (detalhes brutos): {raw_msg}",
+                )
+            except Exception:
+                pass
+
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Falha ao registrar devolucao. Verifique o log para mais detalhes."
             )
-            QMessageBox.critical(self, "Erro", f"Falha ao registrar devolução:\n{e}")
 
     def obter_dados_da_tabela(self):
         dados = []
@@ -663,11 +850,11 @@ class MovimentacoesTab(QWidget):
             dados = self.obter_dados_da_tabela()
             with open(caminho, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"])
+                writer.writerow(["ID", "Chave", "Descrição sala", "Utilizador", "Vínculo", "Retirada", "Devolução", "Status"])
                 for row in dados:
                     row = list(row)
-                    row[4] = formatar_data_br(row[4])
-                    row[5] = formatar_data_br(row[5])
+                    row[5] = formatar_data_br(row[5])  # Retirada
+                    row[6] = formatar_data_br(row[6])  # Devolução
                     writer.writerow(row)
 
             dash = self._get_dash_main()
@@ -683,14 +870,14 @@ class MovimentacoesTab(QWidget):
             c.setFont("Helvetica-Bold", 16)
             c.drawString(50, height - 50, "Relatório de Movimentações")
             c.setFont("Helvetica", 12)
-            cabecalho = ["ID", "Chave", "Utilizador", "E-mail", "Retirada", "Devolução", "Status"]
+            cabecalho = ["ID", "Chave", "Descrição sala", "Utilizador", "Vínculo", "Retirada", "Devolução", "Status"]
             y = height - 80
             c.drawString(50, y, " | ".join(cabecalho))
             y -= 20
             for row in dados:
                 row = list(row)
-                row[4] = formatar_data_br(row[4])
                 row[5] = formatar_data_br(row[5])
+                row[6] = formatar_data_br(row[6])
                 c.drawString(50, y, " | ".join([str(x) if x else "" for x in row]))
                 y -= 20
                 if y < 50:
@@ -710,7 +897,7 @@ def verificar_pendencias_e_enviar_emails():
     cursor.execute("""
         SELECT id, chave, usuario, email, data_retirada, alerta_enviado
         FROM movimentacoes
-        WHERE status = 'indisponível'
+        WHERE status = 'indisponivel'
     """)
     rows = cursor.fetchall()
     conn.close()
@@ -723,7 +910,10 @@ def verificar_pendencias_e_enviar_emails():
             continue
 
         try:
-            retirada_dt = datetime.strptime(data_retirada, "%Y-%m-%d %H:%M:%S")
+            if isinstance(data_retirada, datetime):
+                retirada_dt = data_retirada
+            else:
+                retirada_dt = datetime.strptime(str(data_retirada), "%Y-%m-%d %H:%M:%S")
             diff_horas = (now - retirada_dt).total_seconds() / 3600
         except Exception as e:
             log_acao(

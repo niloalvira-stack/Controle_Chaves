@@ -1,224 +1,182 @@
 # autenticacao/login_window.py
 
 import traceback
+
 from PyQt5.QtWidgets import (
-    QWidget, QLineEdit, QLabel, QPushButton, QVBoxLayout,
-    QMessageBox, QDialog, QFormLayout, QDialogButtonBox
+    QWidget,
+    QMessageBox,
+    QVBoxLayout,
+    QFormLayout,
+    QLineEdit,
+    QPushButton,
+    QDialog,
+    QDialogButtonBox,
 )
 
-from .autenticacao import (
-    get_user_by_login, verify_password, hash_password,
-    show_info, show_warning
+from autenticacao.session import session_manager
+from autenticacao.autenticacao import (
+    get_user_by_login,
+    verify_password,
+    hash_password,
+    execute_query,
 )
-from database_module import execute_query
-from .session import session_manager
-from utils.utils_log import log_acao
-from autenticacao import get_current_user
 
 
-class ChangePasswordDialog(QDialog):
-    def __init__(self, user_id):
-        super().__init__()
-        self.user_id = user_id
-        self.setWindowTitle("Trocar Senha - Primeiro Login")
+class PasswordChangeDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Alterar senha (primeiro acesso)")
+        self.resize(320, 180)
 
-        self.layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
 
-        self.new_password = QLineEdit()
-        self.new_password.setEchoMode(QLineEdit.Password)
-        self.confirm_password = QLineEdit()
-        self.confirm_password.setEchoMode(QLineEdit.Password)
+        self.nova_senha = QLineEdit()
+        self.nova_senha.setEchoMode(QLineEdit.Password)
+        self.confirma_senha = QLineEdit()
+        self.confirma_senha.setEchoMode(QLineEdit.Password)
 
-        self.layout.addRow("Nova Senha:", self.new_password)
-        self.layout.addRow("Confirme Senha:", self.confirm_password)
+        form.addRow("Nova senha:", self.nova_senha)
+        form.addRow("Confirmar senha:", self.confirma_senha)
 
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.buttons.accepted.connect(self.change_password)
-        self.buttons.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttons)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
 
-        self.setLayout(self.layout)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
 
-    def change_password(self):
-        pw = self.new_password.text()
-        confirm = self.confirm_password.text()
-
-        if not pw or not confirm:
-            show_warning("Erro", "Preencha ambos os campos de senha.")
-            return
-
-        if pw != confirm:
-            show_warning("Erro", "As senhas não conferem.")
-            return
-
-        senha_hashed = hash_password(pw)
-
-        # Coluna de senha: ajuste se necessário (senha / senha_hash)
-        query = "UPDATE usuarios SET senha = %s, primeiro_login = %s WHERE id = %s"
-        # Exemplo alternativo:
-        # query = "UPDATE usuarios SET senha_hash = %s, primeiro_login = %s WHERE id = %s"
-
-        execute_query(query, (senha_hashed, False, self.user_id))
-        log_acao(f"Senha alterada com sucesso para usuário id={self.user_id}")
-        show_info("Sucesso", "Senha alterada com sucesso!")
-        self.accept()
+    def get_data(self):
+        return self.nova_senha.text().strip(), self.confirma_senha.text().strip()
 
 
 class LoginWindow(QWidget):
-    def __init__(self, on_login_success):
-        super().__init__()
+    def __init__(self, on_login_success=None, parent=None):
+        super().__init__(parent)
         self.on_login_success = on_login_success
 
         self.setWindowTitle("Login Sistema Controle de Chaves")
-        self.setGeometry(100, 100, 300, 150)
+        self.resize(320, 160)
 
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
 
-        self.label_login = QLabel("Login:")
-        self.input_login = QLineEdit()
-        layout.addWidget(self.label_login)
-        layout.addWidget(self.input_login)
+        self.line_login = QLineEdit()
+        self.line_senha = QLineEdit()
 
-        self.label_senha = QLabel("Senha:")
-        self.input_senha = QLineEdit()
-        self.input_senha.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.label_senha)
-        layout.addWidget(self.input_senha)
+        self.line_senha.setEchoMode(QLineEdit.Password)
 
-        self.btn_entrar = QPushButton("Entrar")
-        self.btn_entrar.clicked.connect(self.try_login)
-        layout.addWidget(self.btn_entrar)
+        form.addRow("Login:", self.line_login)
+        form.addRow("Senha:", self.line_senha)
 
-        self.setLayout(layout)
-        self.centralizar_janela()
-        self.input_login.setFocus()
+        self.btn_login = QPushButton("Entrar")
+        self.btn_login.clicked.connect(self.try_login)
 
-    def centralizar_janela(self):
-        qr = self.frameGeometry()
-        cp = self.screen().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
+        layout.addLayout(form)
+        layout.addWidget(self.btn_login)
 
     def try_login(self):
-        login = self.input_login.text().strip()
-        senha = self.input_senha.text().strip()
-
-        if not login or not senha:
-            QMessageBox.warning(self, "Erro", "Preencha login e senha.")
-            log_acao(f"Tentativa de login com campos vazios (login='{login}')")
-            return
-
-        # Busca usuário no Postgres
-        user = get_user_by_login(login)
-        if not user:
-            QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
-            log_acao(f"Tentativa de login com usuário inexistente: '{login}'")
-            return
-
-        user = dict(user)
-        senha_banco = user["senha"]  # ou senha_hash, conforme seu schema
-
-        # verifica se senha está em formato seguro (bcrypt)
-        hash_valido = senha_banco and senha_banco.startswith("$2b$")
-        if not hash_valido:
-            log_acao(
-                f"Login bloqueado: senha insegura detectada para usuário '{login}'"
-            )
-            show_warning(
-                "Atenção",
-                "Sua senha está salva de forma insegura. Você precisa trocá-la para continuar."
-            )
-            dialog = ChangePasswordDialog(user["id"])
-            if dialog.exec_() == QDialog.Accepted:
-                QMessageBox.information(
-                    self,
-                    "Sucesso",
-                    "Senha cadastrada com segurança! Faça login novamente."
-                )
-                log_acao(
-                    f"Senha atualizada para usuário '{login}' (senha antiga insegura)"
-                )
-                self.input_login.clear()
-                self.input_senha.clear()
-                return
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Aviso",
-                    "Troca de senha obrigatória cancelada."
-                )
-                log_acao(
-                    f"Usuário '{login}' cancelou troca de senha obrigatória"
-                )
-                return
-
-        # valida senha com bcrypt
-        senha_valida = verify_password(senha_banco, senha)
-        print(f"Senha válida? {senha_valida}")
-
-        if not senha_valida:
-            QMessageBox.warning(self, "Erro", "Login ou senha incorretos.")
-            log_acao(f"Tentativa de login inválida para usuário '{login}'")
-            return
+        login = self.line_login.text().strip()
+        senha = self.line_senha.text().strip()
+        ...
 
         try:
-            print("DEBUG: antes de verificar primeiro_login")
-            # Primeiro login exige troca de senha
-            if user.get("primeiro_login"):
-                print("DEBUG: caiu em primeiro_login")
-                log_acao(f"Primeiro login detectado para usuário '{login}'")
-                dialog = ChangePasswordDialog(user["id"])
-                resultado = dialog.exec_()
-                if resultado == QDialog.Accepted:
+            user = get_user_by_login(login)
+
+            if user is None:
+                QMessageBox.warning(self, "Erro", "Utilizador não encontrado.")
+                return
+
+            # aqui segue validação de senha, etc.
+
+            print(
+                "DEBUG user dict no login:",
+                user,
+                type(user.get("primeiro_login")),
+                user.get("primeiro_login"),
+            )
+
+            if not verify_password(user["senha"], senha):
+                QMessageBox.warning(self, "Erro", "Senha inválida.")
+                return
+
+            print("Senha válida? True")
+
+            # Primeiro login: força troca de senha
+            if user.get("primeiro_login") is True:
+                dlg = PasswordChangeDialog(self)
+                if dlg.exec_() != QDialog.Accepted:
                     QMessageBox.information(
                         self,
-                        "Sucesso",
-                        "Senha cadastrada com segurança! Faça login novamente."
-                    )
-                    self.input_senha.clear()
-                    self.input_login.setFocus()
-                    return
-                else:
-                    show_warning(
                         "Aviso",
-                        "É necessário trocar a senha para continuar."
+                        "É necessário alterar a senha no primeiro acesso.",
                     )
-                    log_acao(
-                        f"Usuário '{login}' recusou trocar a senha no primeiro login"
-                    )
-                    self.input_senha.clear()
-                    self.input_login.setFocus()
                     return
 
-            # Login normal (não é primeiro login)
+                nova_senha, confirma = dlg.get_data()
+                if not nova_senha:
+                    QMessageBox.warning(self, "Erro", "Nova senha não pode ser vazia.")
+                    return
+                if nova_senha != confirma:
+                    QMessageBox.warning(self, "Erro", "As senhas não coincidem.")
+                    return
+
+                novo_hash = hash_password(nova_senha)
+
+                print("DEBUG: atualizando senha e primeiro_login para usuário", user["id"])
+                try:
+                    execute_query(
+                        """
+                        UPDATE usuarios
+                        SET senha = %s, primeiro_login = FALSE
+                        WHERE id = %s
+                        """,
+                        (novo_hash, user["id"]),
+                        fetchone=False,
+                    )
+                    print("DEBUG: UPDATE primeiro_login executado")
+                except Exception as e:
+                    print("DEBUG ERRO no UPDATE primeiro_login:", e)
+                    QMessageBox.critical(
+                        self,
+                        "Erro",
+                        f"Erro ao atualizar senha no primeiro login:\n{e}",
+                    )
+                    return
+
+                user["senha"] = novo_hash
+                user["primeiro_login"] = False
+
             print("DEBUG: antes de session_manager.login")
-            if not session_manager.login(user["login"]):
+            login_str = str(user["login"])
+            print("DEBUG: login_str type =", type(login_str), repr(login_str))
+
+            if not session_manager.login(login_str):
                 print("DEBUG: session_manager.login retornou False")
                 QMessageBox.warning(
                     self,
                     "Erro",
                     "Falha ao carregar sessão do usuário."
                 )
-                log_acao(
-                    f"Falha ao carregar sessão para usuário '{login}'"
-                )
                 return
 
             QMessageBox.information(self, "Sucesso", "Login realizado com sucesso.")
-            log_acao(f"Login bem-sucedido para usuário '{login}'")
 
             print("DEBUG: antes de on_login_success")
-            user_atual = get_current_user()
+            user_atual = session_manager.current_user
             print("DEBUG user_atual após login:", user_atual)
-            self.on_login_success(user_atual)
+
+            if self.on_login_success:
+                self.on_login_success(user_atual)
+
             print("DEBUG: depois de on_login_success (antes de close)")
             self.close()
 
         except Exception:
             erro = traceback.format_exc()
-            print(erro)
-            log_acao(f"Erro interno após login para usuário '{login}': {erro}")
-            show_warning(
+            print("ERRO interno no try_login:", erro)
+            QMessageBox.critical(
+                self,
                 "Erro",
-                "Um erro interno ocorreu na transição de telas."
+                "Ocorreu um erro interno ao tentar efetuar o login.",
             )

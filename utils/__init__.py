@@ -2,13 +2,23 @@ from PyQt5.QtWidgets import QMessageBox
 from autenticacao.helpers_autenticacao import get_db_connection
 
 
-def montar_display_sala_variavel(nome, predio, anexo=None):
-    display = nome
+# utils/__init__.py
+
+def montar_display_sala_variavel(nome, predio=None, anexo=None):
+    def _to_str(v):
+        return v.decode("utf-8") if isinstance(v, (bytes, bytearray)) else v
+
+    nome = _to_str(nome)
+    predio = _to_str(predio)
+    anexo = _to_str(anexo)
+
+    display = nome or ""
     if predio:
         display += f" - {predio}"
     if anexo:
-        display += f" - {anexo}"
+        display += f" ({anexo})"
     return display
+
 
 
 def montar_display_sala_por_id(sala_id):

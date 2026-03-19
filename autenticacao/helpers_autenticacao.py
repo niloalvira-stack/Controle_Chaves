@@ -1,17 +1,13 @@
 # autenticacao/helpers_autenticacao.py
 
-import psycopg  # psycopg3
+import psycopg
+from utils.config_app import get_db_config
+
+_DB_CONFIG = get_db_config()
 
 
 def get_db_connection():
     """
-    Retorna uma conexão com o banco PostgreSQL 'controle_chaves'.
-    Ajuste host/user/password se necessário.
+    Retorna conexão com o PostgreSQL usando os dados do config.ini.
     """
-    return psycopg.connect(
-        host="localhost",
-        port=5432,
-        dbname="controle_chaves",
-        user="postgres",
-        password="123456",
-    )
+    return psycopg.connect(**_DB_CONFIG)

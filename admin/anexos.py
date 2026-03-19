@@ -23,11 +23,12 @@ class AnexoDialog(QDialog):
         self.combo_predio.clear()
         self.combo_predio.addItem("Nenhum", None)
 
-        # predios é lista de RealDictRow
+        # predios é lista de tuplas (id, nome)
         print("DEBUG AnexoDialog predios recebidos:", predios)
         for row in predios:
-            pid = row["id"]
-            pname = row["nome"]
+            pid, pname = row
+            if isinstance(pname, (bytes, bytearray)):
+                pname = pname.decode("utf-8")
             self.combo_predio.addItem(str(pname), pid)
 
         # selecionar prédio atual (na edição)
@@ -133,9 +134,13 @@ class AnexosTab(QWidget):
             self.table.setRowCount(len(rows))
 
             for row_idx, row in enumerate(rows):
-                anexo_id = row["id"]
-                anexo_nome = row["anexo_nome"]
-                predio_nome = row["predio_nome"]
+                # row é tupla: (id, anexo_nome, predio_nome)
+                anexo_id, anexo_nome, predio_nome = row
+
+                if isinstance(anexo_nome, (bytes, bytearray)):
+                    anexo_nome = anexo_nome.decode("utf-8")
+                if isinstance(predio_nome, (bytes, bytearray)):
+                    predio_nome = predio_nome.decode("utf-8")
 
                 self.table.setItem(row_idx, 0, QTableWidgetItem(str(anexo_id)))
                 self.table.setItem(row_idx, 1, QTableWidgetItem(str(anexo_nome)))
@@ -194,7 +199,13 @@ class AnexosTab(QWidget):
 
         predios = self.fetch_predios()
         print("DEBUG: predios em editar_anexo:", predios)
-        predio_id = next((p["id"] for p in predios if p["nome"] == predio_nome), None)
+        predio_id = None
+        for pid, pname in predios:
+            if isinstance(pname, (bytes, bytearray)):
+                pname = pname.decode("utf-8")
+            if pname == predio_nome:
+                predio_id = pid
+                break
         print("DEBUG: predio_id resolvido:", predio_id)
 
         dialog = AnexoDialog(predios, nome, predio_id, parent=self)

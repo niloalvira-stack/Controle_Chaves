@@ -4,20 +4,53 @@ from PyQt5.QtWidgets import (
     QProgressDialog, QLabel, QComboBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor
 import csv
 import logging
 from datetime import datetime
+from utils.ui_colors import aplicar_cor_status_item_generico
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet
 
 from autenticacao.helpers_autenticacao import get_db_connection
+import config  # para cores
 
 logger = logging.getLogger(__name__)
+
+ALERTA_HORAS = 6
+
+
+def aplicar_cor_status_item_relatorio(item, status, retirada_val, now):
+    status = (status or "").strip()
+
+    try:
+        if status == "disponível":
+            cor_hex = config.COLOR_STATUS_DISPONIVEL
+
+        elif status == "indisponível":
+            atraso = False
+            if retirada_val:
+                try:
+                    if isinstance(retirada_val, datetime):
+                        retirada_dt = retirada_val
+                    else:
+                        retirada_dt = datetime.strptime(str(retirada_val), "%Y-%m-%d %H:%M:%S")
+                    diff_horas = (now - retirada_dt).total_seconds() / 3600
+                    atraso = diff_horas >= ALERTA_HORAS
+                except Exception:
+                    atraso = False
+
+            cor_hex = config.COLOR_STATUS_ATRASO if atraso else config.COLOR_STATUS_INDISPONIVEL
+        else:
+            return
+
+        item.setBackground(QBrush(QColor(cor_hex)))
+    except Exception:
+        pass
 
 
 class DatabaseLoader(QThread):
@@ -52,13 +85,11 @@ class RelatorioGeralTab(QWidget):
         self.load_relatorio()
 
     def setup_ui(self):
-        """Configura interface com filtros e botões organizados."""
         self.setWindowTitle("Relatório Geral - Controle de Chaves")
         self.resize(1000, 600)
 
         layout = QVBoxLayout(self)
 
-        # Filtros
         filtros_layout = QHBoxLayout()
         filtros_layout.addWidget(QLabel("Período:"))
 
@@ -74,7 +105,6 @@ class RelatorioGeralTab(QWidget):
 
         layout.addLayout(filtros_layout)
 
-        # Botões
         btns_layout = QHBoxLayout()
         self.btn_atualizar = QPushButton("🔄 Atualizar")
         self.btn_csv = QPushButton("📊 CSV")
@@ -85,7 +115,6 @@ class RelatorioGeralTab(QWidget):
         btns_layout.addStretch()
         layout.addLayout(btns_layout)
 
-        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
@@ -97,14 +126,13 @@ class RelatorioGeralTab(QWidget):
         self.setLayout(layout)
 
     def _configurar_tabela(self):
-        """Configura aparência e comportamento da tabela."""
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # ID
-        header.setSectionResizeMode(1, QHeaderView.Stretch)           # Chave
-        header.setSectionResizeMode(2, QHeaderView.Stretch)           # Utilizador
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Status
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Retirada
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Devolução
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
 
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -112,13 +140,11 @@ class RelatorioGeralTab(QWidget):
         self.table.verticalHeader().setVisible(False)
 
     def setup_connections(self):
-        """Conecta sinais aos métodos."""
         self.btn_atualizar.clicked.connect(self.load_relatorio)
         self.btn_csv.clicked.connect(self.exportar_csv)
         self.btn_pdf.clicked.connect(self.exportar_pdf)
 
     def _get_dash_main(self):
-        """Busca DashMain de forma robusta."""
         from PyQt5.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
@@ -128,12 +154,6 @@ class RelatorioGeralTab(QWidget):
         return None
 
     def _query_base(self, periodo="TODOS"):
-        """
-        Query parametrizada com filtros de período (PostgreSQL).
-        - Hoje: data_retirada = CURRENT_DATE
-        - Esta semana: de segunda até hoje
-        - Este mês: ano/mês corrente
-        """
         base_query = """
             SELECT m.id,
                    m.chave,
@@ -165,12 +185,9 @@ class RelatorioGeralTab(QWidget):
         return base_query, params
 
     def _atualizar_query(self):
-        """Chamado quando muda o combo de período (opcionalmente recarrega)."""
-        # Aqui você pode disparar load_relatorio automaticamente se quiser
         pass
 
     def load_relatorio(self):
-        """Carrega dados de forma assíncrona."""
         if self.loader and self.loader.isRunning():
             self.loader.terminate()
 
@@ -185,25 +202,25 @@ class RelatorioGeralTab(QWidget):
         self.btn_atualizar.setText("⏳ Carregando...")
 
     def _preencher_tabela(self, rows):
-        """Preenche tabela com dados carregados."""
         self.dados = rows
         self.table.setRowCount(len(rows))
+        now = datetime.now()
 
         for i, row in enumerate(rows):
+            # row: [id, chave, utilizador, status, data_retirada, data_retorno]
             for j, val in enumerate(row):
-                # formatação simples das datas
+                display_val = val
                 if j in (4, 5) and isinstance(val, datetime):
-                    val = val.strftime("%d/%m/%Y %H:%M:%S")
-                item = QTableWidgetItem(str(val) if val is not None else "")
+                    display_val = val.strftime("%d/%m/%Y %H:%M:%S")
+
+                item = QTableWidgetItem(str(display_val) if display_val is not None else "")
                 item.setTextAlignment(Qt.AlignCenter)
 
-                # Cores por status (ajuste conforme seus valores reais de status)
-                if j == 3:  # Status
-                    status_str = str(val).lower() if val else ""
-                    if "indispon" in status_str:
-                        item.setBackground(Qt.red)
-                    elif "dispon" in status_str:
-                        item.setBackground(Qt.green)
+                if j == 3:
+                    status_str = str(val) if val is not None else ""
+                    retirada_val = row[4]
+                    retorno_val = row[5]
+                    aplicar_cor_status_item_generico(item, status_str, retirada_val, retorno_val, now)
 
                 self.table.setItem(i, j, item)
 
@@ -211,17 +228,14 @@ class RelatorioGeralTab(QWidget):
         self._atualizar_contador()
 
     def _atualizar_contador(self):
-        """Atualiza contador de registros."""
         self.label_total.setText(f"Total: {len(self.dados)} registros")
 
     def _tratar_erro_load(self, erro):
-        """Trata erros de carregamento."""
         QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{erro}")
         self.btn_atualizar.setText("❌ Erro")
         logger.error(f"Erro carregamento relatório: {erro}")
 
     def _get_dados_query(self):
-        """Retorna dados atuais da query para exportação."""
         periodo = self.combo_periodo.currentText().upper().replace(" ", "_")
         query, params = self._query_base(periodo)
         try:
@@ -236,9 +250,6 @@ class RelatorioGeralTab(QWidget):
             raise
 
     def exportar_csv(self):
-        """Exporta para CSV com nome inteligente."""
-        from PyQt5.QtWidgets import QFileDialog
-
         dados = self._get_dados_query()
         if not dados:
             QMessageBox.information(self, "Info", "Não há dados para exportar.")
@@ -260,7 +271,6 @@ class RelatorioGeralTab(QWidget):
                 writer.writerow(["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 for row in dados:
                     row = list(row)
-                    # datas (índices 4 e 5) se forem datetime
                     for idx in (4, 5):
                         if isinstance(row[idx], datetime):
                             row[idx] = row[idx].strftime("%d/%m/%Y %H:%M:%S")
@@ -274,9 +284,6 @@ class RelatorioGeralTab(QWidget):
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV:\n{e}")
 
     def exportar_pdf(self):
-        """Exporta relatório geral em PDF com tabela formatada."""
-        from PyQt5.QtWidgets import QFileDialog
-
         dados = self._get_dados_query()
         if not dados:
             QMessageBox.information(self, "Info", "Não há dados para exportar.")

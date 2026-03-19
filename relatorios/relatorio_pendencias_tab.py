@@ -41,8 +41,9 @@ class PendenciasLoader(QThread):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT
+
+            sql = r"""
+                SELECT 
                     m.chave,
                     COALESCE(u.nome, m.usuario) AS utilizador,
                     m.status,
@@ -51,9 +52,10 @@ class PendenciasLoader(QThread):
                     m.id
                 FROM movimentacoes m
                 LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-                WHERE m.status = 'indisponível'
+                WHERE m.status = 'indisponivel'
                 ORDER BY m.data_retirada ASC
-            """)
+            """
+            cursor.execute(sql)
             rows = cursor.fetchall()
             conn.close()
 

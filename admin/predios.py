@@ -119,11 +119,15 @@ class PrediosTab(QWidget):
 
             self.table.setRowCount(len(predios))
             for row_idx, predio in enumerate(predios):
-                # predio é RealDictRow, acessar por chave
+                # predio é tupla: (id, nome)
                 print("DEBUG linha", row_idx, "->", predio)
+                pid, nome = predio
 
-                self.table.setItem(row_idx, 0, QTableWidgetItem(str(predio["id"])))
-                self.table.setItem(row_idx, 1, QTableWidgetItem(predio["nome"] or ""))
+                if isinstance(nome, (bytes, bytearray)):
+                    nome = nome.decode("utf-8")
+
+                self.table.setItem(row_idx, 0, QTableWidgetItem(str(pid)))
+                self.table.setItem(row_idx, 1, QTableWidgetItem(nome or ""))
 
                 for col in range(2):
                     item = self.table.item(row_idx, col)

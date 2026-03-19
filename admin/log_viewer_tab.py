@@ -4,7 +4,8 @@ import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTextEdit, QPushButton, QFileDialog, QMessageBox
 )
-from utils.utils_log import LOG_FILE  # caminho já definido no utils_log
+from utils.utils_log import LOG_FILE  # <-- usa o LOG_FILE do módulo de auditoria
+
 
 
 class LogViewerTab(QWidget):

@@ -171,7 +171,9 @@ class RelatorioPorUsuarioTab(QWidget):
         conn.close()
 
         for uid, nome in rows:
-            self.cb_usuario.addItem(nome, uid)
+            if isinstance(nome, (bytes, bytearray)):
+                nome = nome.decode("utf-8", errors="ignore")
+            self.cb_usuario.addItem(nome or "", uid)
 
         if usuario_id_atual is not None:
             for idx in range(self.cb_usuario.count()):

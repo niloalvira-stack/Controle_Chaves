@@ -16,19 +16,21 @@ print("DEBUG: carregando admin/salas.py - classe SalasTab nova")
 
 
 class SalaDialog(QDialog):
-    def __init__(self, predios, anexos, nome="", predio_id=None, anexo_id=None, parent=None):
+    def __init__(self, predios, anexos, nome="", descricao="", predio_id=None, anexo_id=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Cadastro/Editar Sala")
         layout = QFormLayout(self)
 
         self.nome_edit = QLineEdit(nome)
+        self.descricao_edit = QLineEdit(descricao)
 
         self.combo_predio = QComboBox()
         self.combo_predio.addItem("Nenhum", None)
-        # predios: lista de RealDictRow
+        # predios: lista de tuplas (id, nome)
         for row in predios:
-            pid = row["id"]
-            pname = row["nome"]
+            pid, pname = row
+            if isinstance(pname, (bytes, bytearray)):
+                pname = pname.decode("utf-8")
             self.combo_predio.addItem(pname, pid)
         if predio_id:
             idx = self.combo_predio.findData(predio_id)
@@ -37,10 +39,11 @@ class SalaDialog(QDialog):
 
         self.combo_anexo = QComboBox()
         self.combo_anexo.addItem("Nenhum", None)
-        # anexos: lista de RealDictRow
+        # anexos: lista de tuplas (id, nome)
         for row in anexos:
-            aid = row["id"]
-            aname = row["nome"]
+            aid, aname = row
+            if isinstance(aname, (bytes, bytearray)):
+                aname = aname.decode("utf-8")
             self.combo_anexo.addItem(aname, aid)
         if anexo_id:
             idx = self.combo_anexo.findData(anexo_id)
@@ -48,6 +51,7 @@ class SalaDialog(QDialog):
                 self.combo_anexo.setCurrentIndex(idx)
 
         layout.addRow("Nome da sala:", self.nome_edit)
+        layout.addRow("Descrição:", self.descricao_edit)
         layout.addRow("Prédio:", self.combo_predio)
         layout.addRow("Anexo:", self.combo_anexo)
 
@@ -61,6 +65,7 @@ class SalaDialog(QDialog):
     def get_data(self):
         return {
             "nome": self.nome_edit.text().strip(),
+            "descricao": self.descricao_edit.text().strip(),
             "predio_id": self.combo_predio.currentData(),
             "anexo_id": self.combo_anexo.currentData(),
         }
@@ -90,8 +95,8 @@ class SalasTab(QWidget):
         layout.addLayout(btn_layout)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "Nome", "Prédio", "Anexo", "Status"])
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["ID", "Nome", "Descrição", "Prédio", "Anexo", "Status"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
@@ -157,6 +162,7 @@ class SalasTab(QWidget):
             cursor.execute("""
                 SELECT s.id,
                        s.nome,
+                       s.descricao,
                        p.nome AS predio_nome,
                        a.nome AS anexo_nome,
                        s.status
@@ -170,19 +176,38 @@ class SalasTab(QWidget):
 
             self.table.setRowCount(len(salas))
             for row_idx, row in enumerate(salas):
-                sid = row["id"]
-                nome = row["nome"]
-                predio_nome = row["predio_nome"]
-                anexo_nome = row["anexo_nome"]
-                status = row["status"]
+                # (id, nome, descricao, predio_nome, anexo_nome, status)
+                sid, nome, descricao, predio_nome, anexo_nome, status = row
+
+                for var_name, value in [
+                    ("nome", nome),
+                    ("descricao", descricao),
+                    ("predio_nome", predio_nome),
+                    ("anexo_nome", anexo_nome),
+                    ("status", status),
+                ]:
+                    if isinstance(value, (bytes, bytearray)):
+                        locals()[var_name] = value.decode("utf-8")
+
+                if isinstance(nome, (bytes, bytearray)):
+                    nome = nome.decode("utf-8")
+                if isinstance(descricao, (bytes, bytearray)):
+                    descricao = descricao.decode("utf-8")
+                if isinstance(predio_nome, (bytes, bytearray)):
+                    predio_nome = predio_nome.decode("utf-8")
+                if isinstance(anexo_nome, (bytes, bytearray)):
+                    anexo_nome = anexo_nome.decode("utf-8")
+                if isinstance(status, (bytes, bytearray)):
+                    status = status.decode("utf-8")
 
                 self.table.setItem(row_idx, 0, QTableWidgetItem(str(sid)))
                 self.table.setItem(row_idx, 1, QTableWidgetItem(nome or ""))
-                self.table.setItem(row_idx, 2, QTableWidgetItem(predio_nome or ""))
-                self.table.setItem(row_idx, 3, QTableWidgetItem(anexo_nome or ""))
-                self.table.setItem(row_idx, 4, QTableWidgetItem(status or ""))
+                self.table.setItem(row_idx, 2, QTableWidgetItem(descricao or ""))
+                self.table.setItem(row_idx, 3, QTableWidgetItem(predio_nome or ""))
+                self.table.setItem(row_idx, 4, QTableWidgetItem(anexo_nome or ""))
+                self.table.setItem(row_idx, 5, QTableWidgetItem(status or ""))
 
-                for col in range(5):
+                for col in range(6):
                     item = self.table.item(row_idx, col)
                     if item:
                         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -213,10 +238,10 @@ class SalasTab(QWidget):
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO salas (nome, predio_id, anexo_id, status)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO salas (nome, descricao, predio_id, anexo_id, status)
+                    VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (nome, data["predio_id"], data["anexo_id"], "disponivel"),
+                    (nome, data["descricao"], data["predio_id"], data["anexo_id"], "disponivel"),
                 )
                 conn.commit()
                 conn.close()
@@ -233,8 +258,9 @@ class SalasTab(QWidget):
 
         sid_item = self.table.item(row, 0)
         nome_item = self.table.item(row, 1)
-        predio_item = self.table.item(row, 2)
-        anexo_item = self.table.item(row, 3)
+        desc_item = self.table.item(row, 2)
+        predio_item = self.table.item(row, 3)
+        anexo_item = self.table.item(row, 4)
 
         if not sid_item:
             QMessageBox.warning(self, "Erro", "Registro inválido.")
@@ -242,6 +268,7 @@ class SalasTab(QWidget):
 
         sala_id = int(sid_item.text())
         nome_atual = nome_item.text() if nome_item else ""
+        descricao_atual = desc_item.text() if desc_item else ""
         predio_nome_atual = predio_item.text() if predio_item else ""
         anexo_nome_atual = anexo_item.text() if anexo_item else ""
 
@@ -250,19 +277,26 @@ class SalasTab(QWidget):
 
         predio_id_atual = None
         for row_p in predios:
-            if row_p["nome"] == predio_nome_atual:
-                predio_id_atual = row_p["id"]
+            pid, pname = row_p
+            if isinstance(pname, (bytes, bytearray)):
+                pname = pname.decode("utf-8")
+            if pname == predio_nome_atual:
+                predio_id_atual = pid
                 break
 
         anexo_id_atual = None
         for row_a in anexos:
-            if row_a["nome"] == anexo_nome_atual:
-                anexo_id_atual = row_a["id"]
+            aid, aname = row_a
+            if isinstance(aname, (bytes, bytearray)):
+                aname = aname.decode("utf-8")
+            if aname == anexo_nome_atual:
+                anexo_id_atual = aid
                 break
 
         dialog = SalaDialog(
             predios, anexos,
             nome=nome_atual,
+            descricao=descricao_atual,
             predio_id=predio_id_atual,
             anexo_id=anexo_id_atual,
             parent=self
@@ -283,10 +317,10 @@ class SalasTab(QWidget):
                 cursor.execute(
                     """
                     UPDATE salas
-                    SET nome = %s, predio_id = %s, anexo_id = %s
+                    SET nome = %s, descricao = %s, predio_id = %s, anexo_id = %s
                     WHERE id = %s
                     """,
-                    (nome_novo, data["predio_id"], data["anexo_id"], sala_id),
+                    (nome_novo, data["descricao"], data["predio_id"], data["anexo_id"], sala_id),
                 )
                 conn.commit()
                 conn.close()
@@ -311,71 +345,77 @@ class SalasTab(QWidget):
         nome = nome_item.text() if nome_item else ""
 
         resp = QMessageBox.question(
-            self,
+            self,  # QWidget pai
             "Confirmação",
             f"Tem certeza que deseja excluir a sala '{nome}'?",
             QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
         )
-        if resp != QMessageBox.Yes:
-            return
 
-        try:
-            conn = get_connection()
-            if conn is None:
-                return
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM salas WHERE id = %s", (sala_id,))
-            conn.commit()
-            conn.close()
-            self.load_salas()
-            self._show_success("Sala excluída com sucesso!")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao excluir sala: {e}")
+        if resp == QMessageBox.Yes:
+            try:
+                conn = get_connection()
+                if conn is None:
+                    return
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM salas WHERE id = %s", (sala_id,))
+                conn.commit()
+                conn.close()
+                self.load_salas()
+                self._show_success("Sala excluída com sucesso!")
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao excluir sala: {e}")
 
     def exportar_csv(self):
-        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
-        if not caminho:
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Exportar salas para CSV", "salas.csv", "CSV (*.csv)"
+        )
+        if not filename:
             return
 
         try:
-            with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
-                writer = csv.writer(f, delimiter=';')
-                writer.writerow(["ID", "Nome", "Prédio", "Anexo", "Status"])
+            with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["ID", "Nome", "Descrição", "Prédio", "Anexo", "Status"])
                 for row in range(self.table.rowCount()):
-                    valores = []
+                    rowdata = []
                     for col in range(self.table.columnCount()):
                         item = self.table.item(row, col)
-                        valores.append(item.text() if item else "")
-                    writer.writerow(valores)
-            self._show_success("Exportação de salas concluída.")
+                        rowdata.append(item.text() if item else "")
+                    writer.writerow(rowdata)
+            self._show_success("Salas exportadas para CSV com sucesso.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
 
     def exportar_pdf(self):
-        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "Arquivo PDF (*.pdf)")
-        if not caminho:
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Exportar salas para PDF", "salas.pdf", "PDF (*.pdf)"
+        )
+        if not filename:
             return
 
         try:
-            doc = SimpleDocTemplate(caminho, pagesize=A4)
-            data = [["ID", "Nome", "Prédio", "Anexo", "Status"]]
+            doc = SimpleDocTemplate(filename, pagesize=A4)
+            data = [["ID", "Nome", "Descrição", "Prédio", "Anexo", "Status"]]
             for row in range(self.table.rowCount()):
-                linha = []
+                rowdata = []
                 for col in range(self.table.columnCount()):
                     item = self.table.item(row, col)
-                    linha.append(item.text() if item else "")
-                data.append(linha)
+                    rowdata.append(item.text() if item else "")
+                data.append(rowdata)
 
-            tabela = Table(data)
-            tabela.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
+            table = Table(data)
+            style = TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ]))
-
-            doc.build([tabela])
-            self._show_success("Exportação em PDF concluída.")
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ])
+            table.setStyle(style)
+            elements = [table]
+            doc.build(elements)
+            self._show_success("Salas exportadas para PDF com sucesso.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar PDF: {e}")

@@ -37,11 +37,12 @@ class UtilizadorDialog(QDialog):
 
         self.combo_vinculo = QComboBox()
         self.combo_vinculo.addItems([
-            "Servidor",
-            "Aluno",
+            "Servidor(a)",
+            "Aluno(a)",
             "Bolsista",
-            "Monitor",
-            "Externo",
+            "Monitor(a)",
+            "Estagiário(a)",
+            "Externo(a)",
         ])
 
         self.combo_ativo = QComboBox()

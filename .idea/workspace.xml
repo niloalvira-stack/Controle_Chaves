@@ -5,30 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0d418c30-b98e-4d7b-8f5b-2124b1b3803e" name="Changes" comment="Backup do sistema Controle de Chaves">
-      <change afterPath="$PROJECT_DIR$/utils/ui_colors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/utils_validade.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/anexos.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/anexos.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/log_viewer_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/log_viewer_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/predios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/predios.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/salas.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/salas.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/admin/usuarios.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/usuarios.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/admin/utilizadores_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/admin/utilizadores_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/autenticacao.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/helpers_autenticacao.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/login_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/login_window.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autenticacao/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/autenticacao/session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controle/movimentacoes.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/movimentacoes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" beforeDir="false" afterPath="$PROJECT_DIR$/controle/selecionar_sala_dialog.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/database_module.py" beforeDir="false" afterPath="$PROJECT_DIR$/database_module.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/interface/dash_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/interface/dash_main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_geral.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_geral.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_pendencias_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" beforeDir="false" afterPath="$PROJECT_DIR$/relatorios/relatorio_usuario_tab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -247,15 +226,18 @@
       <option name="project" value="LOCAL" />
       <updated>1772476914742</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Backup do sistema Controle de Chaves">
+      <option name="closed" value="true" />
+      <created>1773938145149</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1773938145149</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
-    <option name="OPEN_GENERIC_TABS">
-      <map>
-        <entry key="9910558a-e87f-4d03-b4f9-493693bd0935" value="TOOL_WINDOW" />
-      </map>
-    </option>
     <option name="RECENT_FILTERS">
       <map>
         <entry key="Branch">
@@ -273,31 +255,6 @@
     </option>
     <option name="TAB_STATES">
       <map>
-        <entry key="9910558a-e87f-4d03-b4f9-493693bd0935">
-          <value>
-            <State>
-              <option name="FILTERS">
-                <map>
-                  <entry key="branch">
-                    <value>
-                      <list>
-                        <option value="HEAD" />
-                      </list>
-                    </value>
-                  </entry>
-                  <entry key="roots">
-                    <value>
-                      <list>
-                        <option value="$PROJECT_DIR$" />
-                      </list>
-                    </value>
-                  </entry>
-                </map>
-              </option>
-              <option name="SHOW_ONLY_AFFECTED_CHANGES" value="true" />
-            </State>
-          </value>
-        </entry>
         <entry key="MAIN">
           <value>
             <State>

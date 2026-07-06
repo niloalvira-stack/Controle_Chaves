@@ -3,4 +3,4 @@ venv/
 __pycache__/
 controle_chaves.db
 .DS_Store
-*.log
+*.logconfig.ini

@@ -1,10 +1,11 @@
 # autenticacao/session.py
 
 import time
+import traceback
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
 
-from autenticacao.autenticacao import execute_query
+from database_module import execute_query
 from utils.utils_log import log_acao
 
 
@@ -24,19 +25,39 @@ class SessionManager:
         self.login_time: Optional[float] = None
         self.last_activity: Optional[float] = None
 
-    # ------------------------------------------------------------------
-    # Login / Logout
-    # ------------------------------------------------------------------
+    def _normalizar_row_usuario(self, row) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+
+        if isinstance(row, dict):
+            return {
+                "id": row.get("id"),
+                "login": row.get("login"),
+                "nome": row.get("nome"),
+                "is_admin": row.get("is_admin", False),
+            }
+
+        if isinstance(row, (tuple, list)):
+            if len(row) < 4:
+                return None
+            return {
+                "id": row[0],
+                "login": row[1],
+                "nome": row[2],
+                "is_admin": row[3],
+            }
+
+        return None
+
     def login(self, login: str) -> bool:
-        """
-        Carrega os dados do usuário a partir do banco (tabela usuarios)
-        e preenche a sessão global, incluindo o flag is_admin.
-        """
         try:
-            print("DEBUG SessionManager.login: login recebido =", login, type(login))
             if isinstance(login, bytes):
                 login = login.decode("utf-8", errors="ignore")
-                print("DEBUG SessionManager.login: login convertido =", login, type(login))
+
+            login = str(login).strip()
+            if not login:
+                print("SESSION: login vazio.")
+                return False
 
             sql = """
                 SELECT id, login, nome, is_admin
@@ -44,58 +65,87 @@ class SessionManager:
                 WHERE login = %s
             """
             row = execute_query(sql, (login,), fetchone=True)
+
+            print("SESSION LOGIN RECEBIDO:", repr(login))
+            print("SESSION ROW RETORNADA:", row)
+
         except Exception as e:
-            log_acao(f"Erro ao buscar usuário para login '{login}': {e}")
+            traceback.print_exc()
+            print(f"ERRO ao buscar usuário para login '{login}': {type(e).__name__}: {e}")
+            log_acao(f"Erro ao buscar usuário para login '{login}': {type(e).__name__}: {e}")
             return False
 
-        if not row:
+        dados = self._normalizar_row_usuario(row)
+        print("SESSION DADOS NORMALIZADOS:", dados)
+
+        if not dados:
+            print(f"SESSION: usuário inexistente na sessão: {login!r}")
             log_acao(f"Tentativa de login com usuário inexistente na sessão: '{login}'")
             return False
 
-        user = row  # já é dict
-        is_admin_flag = bool(user.get("is_admin", False))
+        login_db = dados.get("login")
+        nome_db = dados.get("nome")
+
+        if isinstance(login_db, bytes):
+            login_db = login_db.decode("utf-8", errors="ignore")
+        if isinstance(nome_db, bytes):
+            nome_db = nome_db.decode("utf-8", errors="ignore")
+
+        if login_db is None:
+            login_db = ""
+        if nome_db is None:
+            nome_db = ""
+
+        valor_is_admin = dados.get("is_admin", False)
+        if isinstance(valor_is_admin, str):
+            is_admin_flag = valor_is_admin.strip().lower() in ("1", "true", "t", "sim", "yes")
+        else:
+            is_admin_flag = bool(valor_is_admin)
+
+        try:
+            user_id = int(dados.get("id"))
+        except (TypeError, ValueError):
+            print(f"SESSION: ID inválido: {dados.get('id')!r}")
+            log_acao(f"ID inválido ao carregar sessão do usuário '{login}': {dados.get('id')}")
+            return False
 
         self.current_user = SessionUser(
-            id=user["id"],
-            login=user["login"],
-            nome=user["nome"],
+            id=user_id,
+            login=str(login_db),
+            nome=str(nome_db),
             is_admin=is_admin_flag,
         )
-        self.user_login = user["login"]
+        self.user_login = str(login_db)
         self.is_admin = is_admin_flag
         self.login_time = time.time()
         self.last_activity = time.time()
+
+        print("SESSION current_user:", self.current_user)
+        log_acao(f"Sessão iniciada para usuário '{self.user_login}'")
         return True
 
     def logout(self) -> None:
         if self.user_login:
             log_acao(f"Usuário '{self.user_login}' fez logout da sessão")
+
         self.current_user = None
         self.user_login = None
         self.is_admin = False
         self.login_time = None
         self.last_activity = None
 
-    # ------------------------------------------------------------------
-    # Informações da sessão
-    # ------------------------------------------------------------------
     def is_logged_in(self) -> bool:
         return self.current_user is not None
 
     def touch(self) -> None:
-        """Atualiza timestamp da última atividade."""
         if self.current_user:
             self.last_activity = time.time()
 
     def get_user_info(self) -> Optional[Dict[str, Any]]:
-        """Retorna um dicionário com dados do usuário atual ou None."""
         if not self.current_user:
             return None
         return asdict(self.current_user)
 
-    # ------------------------------------------------------------------
-    # Atalhos para campos específicos
-    # ------------------------------------------------------------------
     def get_user_id(self) -> Optional[int]:
         return self.current_user.id if self.current_user else None
 
@@ -103,16 +153,10 @@ class SessionManager:
         return self.current_user.login if self.current_user else None
 
 
-# Instância global da sessão
 session_manager = SessionManager()
 
 
-# Funções de atalho usadas pelo resto da aplicação
 def validar_login(login: str) -> bool:
-    """
-    Versão simples: só verifica se o login existe e carrega a sessão.
-    Se você precisar validar senha aqui também, pode adaptar.
-    """
     return session_manager.login(login)
 
 

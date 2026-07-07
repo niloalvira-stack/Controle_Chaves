@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QFileDialog, QMessageBox, QHeaderView, QApplication
 )
-from PyQt5.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, Qt
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
@@ -54,17 +54,18 @@ class RelatoriosGeralTab(QWidget):
             ["ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"]
         )
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        self.table.setColumnHidden(0, True)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        layout.addWidget(self.table)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
 
+        self.table.setColumnHidden(0, True)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+
+        layout.addWidget(self.table)
         self.setLayout(layout)
         self.load_relatorio()
 
@@ -148,7 +149,7 @@ class RelatoriosGeralTab(QWidget):
                     if j in (4, 5):
                         val = formatar_data_br(val)
                     item = QTableWidgetItem(str(val) if val else "")
-                    item.setTextAlignment(Qt.AlignCenter)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.table.setItem(i, j, item)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")

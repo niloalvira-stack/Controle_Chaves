@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QFileDialog, QMessageBox, QHeaderView,
     QLabel, QProgressBar
 )
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal, QDateTime
+from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal, QDateTime
 import csv
 import logging
 from datetime import datetime
@@ -82,7 +82,7 @@ class RelatorioPendenciasTab(QWidget):
         self.table.setHorizontalHeaderLabels([
             "Chave", "Utilizador", "Status", "Data Retirada", "Data Retorno"
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         # Barra de progresso / status

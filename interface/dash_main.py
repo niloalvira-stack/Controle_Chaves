@@ -1,39 +1,30 @@
-# interface/dash_main.py
-
+import traceback
 from datetime import datetime
 
-from PyQt5.QtWidgets import (
-    QMainWindow,
-    QTabWidget,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QMessageBox,
-    QLabel,
-    QApplication,
-    QSpacerItem,
-    QSizePolicy,
+from PyQt6.QtWidgets import (
+    QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QMessageBox, QLabel, QApplication, QSpacerItem, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPixmap
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap
 
 from admin.utilizadores_tab import UtilizadoresTab
 from admin.admin import AdminTab
 from admin.log_viewer_tab import LogViewerTab
-from controle.movimentacoes import MovimentacoesTab
+from controle.movimentacoes import MovimentacoesTab, ha_chaves_em_atraso
 from relatorios.relatorios_tab import RelatoriosTab
 from autenticacao import session_manager
+from utils.utils_log import get_logger
 import config
+
+logger = get_logger(__name__)
 
 
 class DashMain(QMainWindow):
     def __init__(self, on_logout=None):
         super().__init__()
-
-        print("DashMain.__init__ chamado")
-
         self.on_logout = on_logout
+        self._logout_realizado = False
 
         user = session_manager.current_user
         if not user:
@@ -45,146 +36,194 @@ class DashMain(QMainWindow):
             self.user_nome = getattr(user, "nome", "Desconhecido")
             self.user_is_admin = getattr(user, "is_admin", False)
 
+        logger.info(
+            "Inicializando DashMain para %s (%s)",
+            self.user_nome,
+            self.user_login
+        )
+
         self.setWindowTitle("Controle de Chaves - Painel Principal")
         self.resize(1024, 768)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
         layout_principal = QVBoxLayout(central_widget)
 
-        # TOPO - relógio
+        self.lblAlertaChaves = QLabel()
+        self.lblAlertaChaves.setStyleSheet(
+            "QLabel { background-color: #ffcc00; color: #000; font-weight: bold; padding: 8px; }"
+        )
+        self.lblAlertaChaves.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lblAlertaChaves.setText(
+            "Há chaves com devolução em atraso. Verifique o controle."
+        )
+        self.lblAlertaChaves.hide()
+        layout_principal.addWidget(self.lblAlertaChaves)
+        layout_principal.addSpacing(24)
+
         topo_layout = QHBoxLayout()
 
         self.label_hora = QLabel()
-        self.label_hora.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.label_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_hora.setStyleSheet(
             "QLabel { background-color: black; color: #00ff00; "
             "font-size: 22px; font-weight: bold; padding: 4px 10px; }"
         )
-
         topo_layout.addWidget(self.label_hora)
 
-        topo_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        topo_spacer = QSpacerItem(
+            40, 20,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum
+        )
         topo_layout.addItem(topo_spacer)
-
         layout_principal.addLayout(topo_layout)
 
-        # LOGO CENTRAL
         self.logo_label = QLabel()
-        self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed
+        )
 
         pix = QPixmap(config.APP_LOGO_PATH)
         if not pix.isNull():
-            pix = pix.scaledToHeight(120, Qt.SmoothTransformation)
+            pix = pix.scaledToHeight(
+                120,
+                Qt.TransformationMode.SmoothTransformation
+            )
             self.logo_label.setPixmap(pix)
         else:
             self.logo_label.setText(config.APP_NAME)
             self.logo_label.setStyleSheet("font-size: 18px; font-weight: bold;")
 
-        layout_principal.addWidget(self.logo_label, alignment=Qt.AlignCenter)
+        layout_principal.addWidget(
+            self.logo_label,
+            alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
-        # TABS
         self.tabs = QTabWidget()
         layout_principal.addWidget(self.tabs)
 
-        # BARRA INFERIOR: usuário + botões
         bottom_bar_layout = QHBoxLayout()
 
         self.label_usuario_bottom = QLabel(
-            f"Utilizador logado: {self.user_nome} ({self.user_login})"
+            f"Utilizador: {self.user_nome} ({self.user_login})"
         )
-        self.label_usuario_bottom.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.label_usuario_bottom.setStyleSheet("color: #555555; padding: 4px;")
+        self.label_usuario_bottom.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_usuario_bottom.setStyleSheet("color: #555; padding: 4px;")
         bottom_bar_layout.addWidget(self.label_usuario_bottom)
 
-        bottom_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        bottom_spacer = QSpacerItem(
+            40, 20,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum
+        )
         bottom_bar_layout.addItem(bottom_spacer)
 
-        # Botão Sobre (laranja, como Filtrar/Verificar)
         self.btn_sobre = QPushButton("Sobre")
         self.btn_sobre.clicked.connect(self.mostrar_sobre)
         self.btn_sobre.setStyleSheet(
-            f"QPushButton {{ background-color: {config.COLOR_BTN_LARANJA}; "
-            f"color: {config.COLOR_BTN_TEXTO_ESCURO}; padding: 6px 12px; "
-            f"border-radius: 6px; }}"
+            f"QPushButton {{ "
+            f"background-color: {config.COLOR_BTN_LARANJA}; "
+            f"color: {config.COLOR_BTN_TEXTO_ESCURO}; "
+            f"padding: 6px 12px; border-radius: 6px; }}"
         )
         bottom_bar_layout.addWidget(self.btn_sobre)
 
-        # Botão Logout (azul, como Devolver)
         self.btn_logout = QPushButton("Logout")
         self.btn_logout.clicked.connect(self.confirmar_logout)
         self.btn_logout.setStyleSheet(
-            f"QPushButton {{ background-color: {config.COLOR_BTN_AZUL}; "
-            f"color: {config.COLOR_BTN_TEXTO}; padding: 6px 12px; "
-            f"border-radius: 6px; }}"
+            f"QPushButton {{ "
+            f"background-color: {config.COLOR_BTN_AZUL}; "
+            f"color: {config.COLOR_BTN_TEXTO}; "
+            f"padding: 6px 12px; border-radius: 6px; }}"
         )
         bottom_bar_layout.addWidget(self.btn_logout)
 
-        # Botão Sair (verde, como Registrar Retirada)
         self.btn_sair = QPushButton("Sair")
         self.btn_sair.clicked.connect(self.sair)
         self.btn_sair.setStyleSheet(
-            f"QPushButton {{ background-color: {config.COLOR_BTN_VERDE}; "
-            f"color: {config.COLOR_BTN_TEXTO}; padding: 6px 12px; "
-            f"border-radius: 6px; }}"
+            f"QPushButton {{ "
+            f"background-color: {config.COLOR_BTN_VERDE}; "
+            f"color: {config.COLOR_BTN_TEXTO}; "
+            f"padding: 6px 12px; border-radius: 6px; }}"
         )
         bottom_bar_layout.addWidget(self.btn_sair)
 
         layout_principal.addLayout(bottom_bar_layout)
 
-        # FEEDBACK (barra inferior central)
         self.feedback_label = QLabel("")
-        self.feedback_label.setAlignment(Qt.AlignCenter)
+        self.feedback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.feedback_label.setStyleSheet(
             "QLabel { background-color: #dff0d8; color: #3c763d; padding: 6px; }"
         )
-        self.feedback_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.feedback_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed
+        )
         self.feedback_label.hide()
-
         layout_principal.addWidget(self.feedback_label)
 
-        # Relógio timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.atualizar_hora)
         self.timer.start(1000)
         self.atualizar_hora()
 
-        self.mov_tab = None
-        self.rel_tab = None
-        self.util_tab = None
-        self.admin_tab = None
-        self.logs_tab = None
-
         self.load_tabs()
 
+        self.timer_chaves_atraso = QTimer(self)
+        self.timer_chaves_atraso.timeout.connect(self.verificar_chaves_atraso)
+        self.timer_chaves_atraso.start(60000)
+        self.verificar_chaves_atraso()
+
     def atualizar_hora(self):
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.label_hora.setText(agora)
+        self.label_hora.setText(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+
+    def verificar_chaves_atraso(self):
+        try:
+            tem_atraso, qtd = ha_chaves_em_atraso()
+
+            if tem_atraso:
+                self.lblAlertaChaves.setText(f"Há {qtd} chave(s) em atraso!")
+                self.lblAlertaChaves.show()
+            else:
+                self.lblAlertaChaves.hide()
+
+        except Exception:
+            logger.exception("Erro ao verificar chaves em atraso")
+            self.lblAlertaChaves.hide()
 
     def mostrar_sobre(self):
-        info = (
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Sobre")
+        msg.setText(
             f"{config.APP_NAME}\n"
             f"Versão: {config.APP_VERSION}\n"
-            f"Desenvolvedor: {config.APP_DEVELOPER}\n"
-            f"Empresa: {config.APP_COMPANY}\n"
-            f"{config.APP_COPYRIGHT}"
+            f"{config.APP_COMPANY}"
         )
-        QMessageBox.information(self, "Sobre", info)
 
-    def show_operation_done(self, message="Operação concluída com sucesso."):
-        self.feedback_label.setText(message)
+        pix = QPixmap(config.APP_LOGO_PATH)
+        if not pix.isNull():
+            pix = pix.scaled(
+                96,
+                96,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            msg.setIconPixmap(pix)
+        else:
+            msg.setIcon(QMessageBox.Icon.Information)
+
+        msg.exec()
+
+    def show_operation_done(self, mensagem="Operação concluída"):
+        self.feedback_label.setText(mensagem)
         self.feedback_label.show()
         QTimer.singleShot(4000, self.feedback_label.hide)
 
-    def show_status_message(self, message):
-        self.show_operation_done(message)
-
     def load_tabs(self):
-        print("Entrou em load_tabs()")
         self.tabs.clear()
-
         self.mov_tab = None
         self.rel_tab = None
         self.util_tab = None
@@ -194,59 +233,115 @@ class DashMain(QMainWindow):
         try:
             self.mov_tab = MovimentacoesTab()
             self.tabs.addTab(self.mov_tab, "Movimentações")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao carregar aba Movimentações:\n{e}")
+        except Exception:
+            logger.exception("Erro na aba Movimentações")
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Falha ao carregar aba Movimentações."
+            )
 
         try:
             self.rel_tab = RelatoriosTab()
             self.tabs.addTab(self.rel_tab, "Relatórios")
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao carregar aba Relatórios:\n{e}")
+            erro = traceback.format_exc()
+            logger.exception("Erro na aba Relatórios")
+
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Critical)
+            msg.setWindowTitle("Erro")
+            msg.setText("Falha ao carregar aba Relatórios.")
+            msg.setInformativeText(str(e))
+            msg.setDetailedText(erro)
+            msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg.exec()
 
         try:
-            self.util_tab = UtilizadoresTab(movimentacoes_tab=self.mov_tab)
+            if self.mov_tab is not None:
+                self.util_tab = UtilizadoresTab(self.mov_tab)
+            else:
+                self.util_tab = UtilizadoresTab(None)
+
             self.tabs.addTab(self.util_tab, "Utilizadores")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao carregar aba Utilizadores:\n{e}")
+        except Exception:
+            logger.exception("Erro na aba Utilizadores")
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Falha ao carregar aba Utilizadores."
+            )
 
-        try:
-            if bool(self.user_is_admin):
-                self.admin_tab = AdminTab()
+        if self.user_is_admin:
+            try:
+                self.admin_tab = AdminTab({
+                    "login": self.user_login,
+                    "nome": self.user_nome,
+                    "is_admin": True
+                })
                 self.tabs.addTab(self.admin_tab, "Administração")
 
                 self.logs_tab = LogViewerTab()
                 self.tabs.addTab(self.logs_tab, "Logs")
-        except Exception as e:
-            QMessageBox.warning(self, "Aviso", f"Falha ao verificar permissões de administrador:\n{e}")
+
+            except Exception as e:
+                logger.exception("Erro nas abas de admin")
+                QMessageBox.warning(
+                    self,
+                    "Erro",
+                    f"Falha ao carregar permissões:\n{e}"
+                )
+
+    def _executar_logout(self):
+        if self._logout_realizado:
+            return
+
+        try:
+            session_manager.logout()
+            self._logout_realizado = True
+            logger.info(
+                "Logout realizado para %s (%s)",
+                self.user_nome,
+                self.user_login
+            )
+        except Exception:
+            erro_completo = traceback.format_exc()
+            logger.exception("Erro ao realizar logout")
+            QMessageBox.warning(
+                self,
+                "Erro",
+                f"Falha ao realizar logout:\n\n{erro_completo}"
+            )
 
     def confirmar_logout(self):
         resp = QMessageBox.question(
             self,
             "Logout",
-            "Deseja realmente terminar a sessão e voltar para a tela de login?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            "Deseja sair?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        if resp == QMessageBox.Yes:
-            try:
-                session_manager.logout()
-            except Exception:
-                pass
+
+        if resp == QMessageBox.StandardButton.Yes:
+            self._executar_logout()
 
             if self.on_logout:
-                try:
-                    self.on_logout()
-                except Exception:
-                    pass
+                self.on_logout()
             else:
                 self.close()
 
-    def closeEvent(self, event):
-        try:
-            session_manager.logout()
-        except Exception:
-            pass
-        super().closeEvent(event)
-
     def sair(self):
         QApplication.instance().quit()
+
+    def closeEvent(self, event):
+        try:
+            if hasattr(self, "timer") and self.timer.isActive():
+                self.timer.stop()
+
+            if hasattr(self, "timer_chaves_atraso") and self.timer_chaves_atraso.isActive():
+                self.timer_chaves_atraso.stop()
+
+            self._executar_logout()
+        except Exception:
+            logger.exception("Erro durante o fechamento da janela")
+        finally:
+            super().closeEvent(event)

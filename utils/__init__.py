@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox
 from autenticacao.helpers_autenticacao import get_db_connection
 
 
@@ -43,7 +43,7 @@ def show_info(title: str, message: str):
     msg.setIcon(QMessageBox.Information)
     msg.setWindowTitle(title)
     msg.setText(message)
-    msg.exec_()
+    msg.exec()
 
 
 def show_warning(title: str, message: str):
@@ -51,4 +51,4 @@ def show_warning(title: str, message: str):
     msg.setIcon(QMessageBox.Warning)
     msg.setWindowTitle(title)
     msg.setText(message)
-    msg.exec_()
+    msg.exec()

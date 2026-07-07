@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView, QApplication
+    QFileDialog, QMessageBox, QDateEdit, QLabel, QHeaderView, QApplication, QAbstractItemView
 )
-from PyQt5.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, Qt
 import csv
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -81,13 +81,13 @@ class RelatorioPorPeriodoTab(QWidget):
             ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
         )
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)          # Chave
-        header.setSectionResizeMode(1, QHeaderView.Stretch)          # Utilizador
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents) # Status
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents) # Retirada
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents) # Devolução
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Chave
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Utilizador
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Retirada
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Devolução
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -192,7 +192,7 @@ class RelatorioPorPeriodoTab(QWidget):
                     if j in (3, 4):  # datas nas posições 3 e 4 após o ID
                         val = formatar_data_br(val)
                     item = QTableWidgetItem(str(val) if val else "")
-                    item.setTextAlignment(Qt.AlignCenter)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.table.setItem(i, j, item)
 
             self.lbl_total.setText(f"{len(rows)} registros")

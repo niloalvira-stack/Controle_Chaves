@@ -1,0 +1,298 @@
+2026-05-29T11:13:52 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T11:13:52 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T11:13:52 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T11:13:53 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T11:13:53 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T11:13:53 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T11:13:53 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T11:13:53 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T11:13:53 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T11:13:53 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T11:13:53 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T11:13:53 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T11:13:53 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T11:13:53 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:25 | Inicializando aba de visualização de logs
+2026-05-29T11:13:53 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:13:53 | WARNING | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:92 | Arquivo de log não encontrado: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:13:53 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T11:14:15 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:14:15 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:105 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:14:16 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:14:16 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:105 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:14:22 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:22 | WARNING | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:92 | Arquivo de log não encontrado: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:23 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:23 | WARNING | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:92 | Arquivo de log não encontrado: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:24 | WARNING | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:92 | Arquivo de log não encontrado: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:27 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:27 | WARNING | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:92 | Arquivo de log não encontrado: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:14:31 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:14:31 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:105 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:14:34 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:83 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:14:34 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:105 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:14:36 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T11:30:30 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T11:30:30 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T11:30:30 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T11:30:30 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T11:30:30 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T11:30:30 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T11:30:30 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T11:30:30 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:30:30 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:116 | Arquivo de log vazio: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:30:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T11:31:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:31:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:116 | Arquivo de log vazio: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:31:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:31:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:31:17 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T11:31:17 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T11:31:39 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:31:39 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:116 | Arquivo de log vazio: C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T11:31:49 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T13:28:24 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T13:28:24 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T13:28:24 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T13:28:24 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T13:28:24 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T13:28:24 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T13:28:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T13:28:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T13:28:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T13:28:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T13:28:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T13:28:33 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T13:28:33 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T13:28:35 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T13:28:35 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T13:28:53 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T13:28:53 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T13:29:10 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T14:15:02 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T14:15:02 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T14:15:02 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T14:15:02 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T14:15:03 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T14:15:03 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T14:15:03 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T14:15:03 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T14:15:03 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T14:15:03 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T14:15:03 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T14:15:03 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T14:15:03 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T14:15:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T14:15:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:15:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:15:03 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T14:15:03 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T14:15:19 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:15:19 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:15:21 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:15:21 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:16:03 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T14:16:20 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:310 | Fechando DashMain
+2026-05-29T14:18:59 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T14:18:59 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T14:18:59 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T14:18:59 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T14:19:00 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T14:19:00 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T14:19:00 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T14:19:00 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T14:19:00 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T14:19:00 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T14:19:00 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T14:19:00 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T14:19:00 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T14:19:00 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T14:19:00 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:19:00 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:19:00 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T14:19:00 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T14:19:10 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:19:10 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:19:11 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:19:11 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:19:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:19:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:19:14 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:19:14 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:19:23 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:19:23 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:19:37 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T14:20:15 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T14:20:15 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T14:20:15 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T14:20:15 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T14:20:16 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T14:20:16 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T14:20:16 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T14:20:16 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T14:20:16 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T14:20:16 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T14:20:16 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T14:20:16 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T14:20:16 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T14:20:16 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T14:20:16 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:20:16 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:20:16 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T14:20:16 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T14:20:20 | INFO | app_daily.interface.dash_main | dash_main | confirmar_logout:293 | Logout confirmado pelo utilizador admin
+2026-05-29T14:20:20 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:310 | Fechando DashMain
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T14:23:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T14:23:43 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T14:23:44 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T14:23:44 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T14:23:44 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T14:23:44 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T14:23:44 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T14:23:44 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T14:23:44 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T14:23:44 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:23:44 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:23:44 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T14:23:44 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 1 chave(s) com devolução em atraso
+2026-05-29T14:23:48 | INFO | app_daily.interface.dash_main | dash_main | confirmar_logout:293 | Logout confirmado pelo utilizador admin
+2026-05-29T14:23:48 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:310 | Fechando DashMain
+2026-05-29T14:53:42 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T14:53:43 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T14:53:43 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T14:53:43 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T14:53:43 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T14:53:43 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T14:53:43 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T14:53:43 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T14:53:43 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:53:43 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:53:43 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T14:53:43 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 2 chave(s) com devolução em atraso
+2026-05-29T14:54:02 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:54:02 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:54:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:54:03 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:54:04 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29052026.log
+2026-05-29T14:54:04 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-05-29T14:54:22 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:54:22 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:54:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T14:54:24 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T14:54:27 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T15:19:24 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T15:19:24 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T15:19:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T15:19:24 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T15:19:25 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T15:19:25 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T15:19:25 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T15:19:25 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T15:19:25 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T15:19:25 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T15:19:25 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T15:19:25 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T15:19:25 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T15:19:25 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T15:19:25 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T15:19:25 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T15:19:25 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T15:19:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:20:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:21:13 | INFO | app_daily.interface.dash_main | dash_main | show_operation_done:228 | Mensagem de feedback exibida: Utilizador cadastrado
+2026-05-29T15:21:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:22:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:23:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:24:24 | INFO | app_daily.interface.dash_main | dash_main | confirmar_logout:293 | Logout confirmado pelo utilizador admin
+2026-05-29T15:24:24 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:310 | Fechando DashMain
+2026-05-29T15:24:25 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T15:24:42 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T15:24:42 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T15:24:42 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T15:24:42 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T15:24:42 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T15:24:42 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T15:24:42 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T15:24:42 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T15:24:42 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T15:24:42 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T15:24:42 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 4 chave(s) com devolução em atraso
+2026-05-29T15:25:41 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T15:53:15 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T15:53:15 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T15:53:15 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T15:53:15 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T15:53:16 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T15:53:16 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:266 | Falha ao carregar aba Utilizadores
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 262, in load_tabs
+    self.util_tab = UtilizadoresTab(movimentacoes_tab=self.mov_tab)
+                    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Controle_Chaves\admin\utilizadores_tab.py", line 128, in __init__
+    self.carregar_dados()
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'UtilizadoresTab' object has no attribute 'carregar_dados'
+2026-05-29T15:53:19 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T15:53:19 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T15:53:19 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T15:53:19 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T15:53:19 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T15:53:19 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T15:53:19 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T15:53:19 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T15:53:19 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T15:53:19 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T15:53:19 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T15:53:19 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 6 chave(s) com devolução em atraso
+2026-05-29T15:53:29 | INFO | app_daily.interface.dash_main | dash_main | sair:318 | Encerrando aplicação via botão Sair
+2026-05-29T15:54:12 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-05-29T15:54:12 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-05-29T15:54:12 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-05-29T15:54:12 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-05-29T15:54:13 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-05-29T15:54:13 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-05-29T15:54:13 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-05-29T15:54:13 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-05-29T15:54:13 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-05-29T15:54:13 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-05-29T15:54:13 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-05-29T15:54:13 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-05-29T15:54:13 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:273 | Aba 'Administração' carregada com sucesso
+2026-05-29T15:54:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-05-29T15:54:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29052026.log
+2026-05-29T15:54:13 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-05-29T15:54:13 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Logs' carregada com sucesso
+2026-05-29T15:54:13 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 6 chave(s) com devolução em atraso
+2026-05-29T15:54:35 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:310 | Fechando DashMain

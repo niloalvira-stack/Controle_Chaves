@@ -1,13 +1,14 @@
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QFileDialog, QMessageBox, QHeaderView,
-    QProgressDialog, QLabel, QComboBox
+    QProgressDialog, QLabel, QComboBox, QDateEdit
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor
+from PyQt6.QtWidgets import QHeaderView, QTableWidget, QAbstractItemView
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDate
+from PyQt6.QtGui import QBrush, QColor
 import csv
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from utils.ui_colors import aplicar_cor_status_item_generico
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -54,7 +55,6 @@ def aplicar_cor_status_item_relatorio(item, status, retirada_val, now):
 
 
 class DatabaseLoader(QThread):
-    """Thread para carregar dados sem travar a UI."""
     data_loaded = pyqtSignal(list)
     error_occurred = pyqtSignal(str)
 
@@ -94,9 +94,23 @@ class RelatorioGeralTab(QWidget):
         filtros_layout.addWidget(QLabel("Período:"))
 
         self.combo_periodo = QComboBox()
-        self.combo_periodo.addItems(["Todos", "Hoje", "Esta Semana", "Este Mês"])
-        self.combo_periodo.currentTextChanged.connect(self._atualizar_query)
+        self.combo_periodo.addItems(["Todos", "Hoje", "Esta Semana", "Este Mês", "Personalizado"])
         filtros_layout.addWidget(self.combo_periodo)
+
+        # Datas para filtro personalizado
+        filtros_layout.addWidget(QLabel("De:"))
+        self.date_inicio = QDateEdit()
+        self.date_inicio.setCalendarPopup(True)
+        self.date_inicio.setDisplayFormat("dd/MM/yyyy")
+        self.date_inicio.setDate(QDate.currentDate())
+        filtros_layout.addWidget(self.date_inicio)
+
+        filtros_layout.addWidget(QLabel("Até:"))
+        self.date_fim = QDateEdit()
+        self.date_fim.setCalendarPopup(True)
+        self.date_fim.setDisplayFormat("dd/MM/yyyy")
+        self.date_fim.setDate(QDate.currentDate())
+        filtros_layout.addWidget(self.date_fim)
 
         filtros_layout.addStretch()
 
@@ -125,27 +139,46 @@ class RelatorioGeralTab(QWidget):
 
         self.setLayout(layout)
 
+        # Inicialmente desabilita datas se não for personalizado
+        self._atualizar_estado_datas()
+
     def _configurar_tabela(self):
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
 
         self.table.setAlternatingRowColors(True)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.verticalHeader().setVisible(False)
 
     def setup_connections(self):
         self.btn_atualizar.clicked.connect(self.load_relatorio)
         self.btn_csv.clicked.connect(self.exportar_csv)
         self.btn_pdf.clicked.connect(self.exportar_pdf)
+        self.combo_periodo.currentTextChanged.connect(self._on_periodo_changed)
+        self.date_inicio.dateChanged.connect(self._on_datas_changed)
+        self.date_fim.dateChanged.connect(self._on_datas_changed)
+
+    def _on_periodo_changed(self, _):
+        self._atualizar_estado_datas()
+        self._atualizar_query()
+
+    def _on_datas_changed(self, _):
+        if self.combo_periodo.currentText() == "Personalizado":
+            self._atualizar_query()
+
+    def _atualizar_estado_datas(self):
+        personalizado = self.combo_periodo.currentText() == "Personalizado"
+        self.date_inicio.setEnabled(personalizado)
+        self.date_fim.setEnabled(personalizado)
 
     def _get_dash_main(self):
-        from PyQt5.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             for widget in app.topLevelWidgets():
@@ -153,7 +186,7 @@ class RelatorioGeralTab(QWidget):
                     return widget
         return None
 
-    def _query_base(self, periodo="TODOS"):
+    def _query_base(self, periodo="TODOS", data_ini: date = None, data_fim: date = None):
         base_query = """
             SELECT m.id,
                    m.chave,
@@ -180,19 +213,35 @@ class RelatorioGeralTab(QWidget):
             base_query += """
                 AND date_trunc('month', m.data_retirada) = date_trunc('month', CURRENT_DATE)
             """
+        elif periodo == "PERSONALIZADO" and data_ini and data_fim:
+            base_query += " AND DATE(m.data_retirada) BETWEEN %s AND %s"
+            params.extend([data_ini, data_fim])
 
         base_query += " ORDER BY m.data_retirada DESC"
         return base_query, params
 
     def _atualizar_query(self):
-        pass
+        # aqui só recarrega se o usuário já estava visualizando
+        self.load_relatorio()
 
     def load_relatorio(self):
         if self.loader and self.loader.isRunning():
             self.loader.terminate()
 
         periodo = self.combo_periodo.currentText().upper().replace(" ", "_")
-        query, params = self._query_base(periodo)
+
+        data_ini = data_fim = None
+        if periodo == "PERSONALIZADO":
+            di = self.date_inicio.date()
+            df = self.date_fim.date()
+            if di > df:
+                QMessageBox.warning(self, "Período inválido",
+                                    "A data inicial não pode ser maior que a data final.")
+                return
+            data_ini = di.toPyDate()
+            data_fim = df.toPyDate()
+
+        query, params = self._query_base(periodo, data_ini, data_fim)
 
         self.loader = DatabaseLoader(query, params)
         self.loader.data_loaded.connect(self._preencher_tabela)
@@ -207,15 +256,13 @@ class RelatorioGeralTab(QWidget):
         now = datetime.now()
 
         for i, row in enumerate(rows):
-            # row: [id, chave, utilizador, status, data_retirada, data_retorno]
             for j, val in enumerate(row):
                 display_val = val
                 if j in (4, 5) and isinstance(val, datetime):
                     display_val = val.strftime("%d/%m/%Y %H:%M:%S")
 
                 item = QTableWidgetItem(str(display_val) if display_val is not None else "")
-                item.setTextAlignment(Qt.AlignCenter)
-
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if j == 3:
                     status_str = str(val) if val is not None else ""
                     retirada_val = row[4]
@@ -237,7 +284,17 @@ class RelatorioGeralTab(QWidget):
 
     def _get_dados_query(self):
         periodo = self.combo_periodo.currentText().upper().replace(" ", "_")
-        query, params = self._query_base(periodo)
+
+        data_ini = data_fim = None
+        if periodo == "PERSONALIZADO":
+            di = self.date_inicio.date()
+            df = self.date_fim.date()
+            if di > df:
+                raise ValueError("Período inválido para exportação (data inicial > final).")
+            data_ini = di.toPyDate()
+            data_fim = df.toPyDate()
+
+        query, params = self._query_base(periodo, data_ini, data_fim)
         try:
             conn = get_db_connection()
             cursor = conn.cursor()

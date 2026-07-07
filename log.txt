@@ -1,0 +1,1 @@
+2026-03-02T12:20:09 action=Login bem-sucedido para usuário 'admin' status=success user="" resource="" details=""

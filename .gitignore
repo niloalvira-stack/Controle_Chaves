@@ -4,3 +4,4 @@ __pycache__/
 controle_chaves.db
 .DS_Store
 *.logconfig.ini
+/config.ini

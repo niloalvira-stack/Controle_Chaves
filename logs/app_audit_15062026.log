@@ -1,0 +1,8 @@
+2026-06-15T13:17:32 level=INFO logger=audit_daily action=Inicialização do sistema status=success user="system" resource="aplicacao" details="base_dir=C:\Controle_Chaves"
+2026-06-15T13:17:46 level=INFO logger=audit_daily action=Login realizado status=success user="admin" resource="autenticacao" details="utilizador_id=1"
+2026-06-15T13:58:17 level=INFO logger=audit_daily action=Inicialização do sistema status=success user="system" resource="aplicacao" details="base_dir=C:\Controle_Chaves"
+2026-06-15T13:58:34 level=INFO logger=audit_daily action=Login realizado status=success user="admin" resource="autenticacao" details="utilizador_id=1"
+2026-06-15T13:59:59 level=INFO logger=audit_daily action=Inicialização do sistema status=success user="system" resource="aplicacao" details="base_dir=C:\Controle_Chaves"
+2026-06-15T14:00:16 level=INFO logger=audit_daily action=Login realizado status=success user="admin" resource="autenticacao" details="utilizador_id=1"
+2026-06-15T14:48:04 level=INFO logger=audit_daily action=Inicialização do sistema status=success user="system" resource="aplicacao" details="base_dir=C:\Controle_Chaves"
+2026-06-15T14:48:24 level=INFO logger=audit_daily action=Login realizado status=success user="admin" resource="autenticacao" details="utilizador_id=1"

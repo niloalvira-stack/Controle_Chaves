@@ -1,0 +1,3 @@
+2026-06-08T11:30:52 level=INFO logger=audit_daily action=Inicialização do sistema status=success user="system" resource="aplicacao" details="base_dir=C:\Controle_Chaves"
+2026-06-08T11:31:07 level=INFO logger=audit_daily action=Login realizado status=success user="admin" resource="autenticacao" details="utilizador_id=1"
+2026-06-08T11:32:06 level=INFO logger=audit_daily action=Usuário 'admin' fez logout da sessão status=success user="" resource="" details=""

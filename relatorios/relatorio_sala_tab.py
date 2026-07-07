@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QComboBox, QLabel, QHeaderView, QDateEdit, QApplication
+    QFileDialog, QComboBox, QLabel, QHeaderView, QDateEdit, QApplication, QAbstractItemView
 )
-from PyQt5.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, Qt
 import csv
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -98,19 +98,23 @@ class RelatorioPorSalaTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
+
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+
         layout.addWidget(self.table)
 
         self.setLayout(layout)
         self.load_chaves()
         self.table.setRowCount(0)
+
 
         self.setStyleSheet("""
             QPushButton {
@@ -230,7 +234,7 @@ class RelatorioPorSalaTab(QWidget):
                 ]
                 for j, val in enumerate(valores):
                     item = QTableWidgetItem(str(val))
-                    item.setTextAlignment(Qt.AlignCenter)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.table.setItem(i, j, item)
 
             self.lbl_total.setText(f"{len(rows)} registros")

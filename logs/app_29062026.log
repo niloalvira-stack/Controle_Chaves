@@ -1,0 +1,193 @@
+2026-06-29T10:02:54 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T10:02:54 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T10:02:54 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T10:02:54 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-06-29T10:02:55 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T10:02:55 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T10:02:56 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T10:02:56 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T10:02:56 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T10:02:56 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T10:02:56 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T10:02:56 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T10:02:56 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T10:02:56 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T10:02:56 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T10:02:56 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T10:02:56 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T10:03:43 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:314 | Fechando DashMain
+2026-06-29T10:20:26 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T10:20:26 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T10:20:26 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T10:20:26 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-06-29T10:20:27 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T10:20:27 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T10:20:27 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T10:20:27 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T10:20:27 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T10:20:27 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T10:20:27 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T10:20:27 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T10:20:27 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T10:20:27 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T10:20:27 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T10:20:27 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T10:20:27 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T10:20:27 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 7 chave(s) com devolução em atraso
+2026-06-29T10:21:27 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 7 chave(s) com devolução em atraso
+2026-06-29T10:22:27 | WARNING | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:195 | Foram encontradas 7 chave(s) com devolução em atraso
+2026-06-29T10:23:05 | INFO | app_daily.interface.dash_main | dash_main | sair:322 | Encerrando aplicação via botão Sair
+2026-06-29T10:28:30 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T10:28:30 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T10:28:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T10:28:30 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-06-29T10:28:31 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T10:28:31 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T10:28:31 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T10:28:31 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T10:28:31 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T10:28:31 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T10:28:31 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T10:28:31 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T10:28:31 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T10:28:31 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T10:28:31 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T10:28:31 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T10:28:31 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T10:29:13 | INFO | app_daily.interface.dash_main | dash_main | sair:322 | Encerrando aplicação via botão Sair
+2026-06-29T11:15:23 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T11:15:23 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T11:15:23 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T11:15:23 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:250 | Falha ao carregar aba Movimentações
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 246, in load_tabs
+    self.mov_tab = MovimentacoesTab()
+                   ~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 373, in __init__
+    self.init_ui()
+    ~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 448, in init_ui
+    self.btn_novo_utilizador.setCursor(Qt.PointingHandCursor)
+                                       ^^
+NameError: name 'Qt' is not defined
+2026-06-29T11:15:28 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T11:15:28 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T11:15:28 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T11:15:28 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T11:15:28 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T11:15:28 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T11:15:28 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T11:15:28 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T11:15:28 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T11:15:28 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T11:15:28 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T11:15:28 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T11:15:28 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T11:15:28 | ERROR | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:200 | Erro ao verificar chaves em atraso
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 188, in verificar_chaves_atraso
+    tem_atraso, qtd = ha_chaves_em_atraso()
+                      ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 1211, in ha_chaves_em_atraso
+    now = datetime.now()
+          ^^^^^^^^
+NameError: name 'datetime' is not defined. Did you forget to import 'datetime'?
+2026-06-29T11:15:40 | INFO | app_daily.interface.dash_main | dash_main | sair:322 | Encerrando aplicação via botão Sair
+2026-06-29T11:15:57 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T11:15:57 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T11:15:57 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T11:15:57 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:250 | Falha ao carregar aba Movimentações
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 246, in load_tabs
+    self.mov_tab = MovimentacoesTab()
+                   ~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 373, in __init__
+    self.init_ui()
+    ~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 448, in init_ui
+    self.btn_novo_utilizador.setCursor(Qt.PointingHandCursor)
+                                       ^^
+NameError: name 'Qt' is not defined
+2026-06-29T11:16:49 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T11:16:49 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T11:16:50 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T11:16:50 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T11:16:50 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T11:16:50 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T11:16:50 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T11:16:50 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T11:16:50 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T11:16:50 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T11:16:50 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T11:16:50 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T11:16:50 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T11:16:50 | ERROR | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:200 | Erro ao verificar chaves em atraso
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 188, in verificar_chaves_atraso
+    tem_atraso, qtd = ha_chaves_em_atraso()
+                      ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 1211, in ha_chaves_em_atraso
+    now = datetime.now()
+          ^^^^^^^^
+NameError: name 'datetime' is not defined. Did you forget to import 'datetime'?
+2026-06-29T11:16:54 | INFO | app_daily.interface.dash_main | dash_main | sair:322 | Encerrando aplicação via botão Sair
+2026-06-29T12:25:45 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T12:25:45 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T12:25:45 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T12:25:45 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:250 | Falha ao carregar aba Movimentações
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 246, in load_tabs
+    self.mov_tab = MovimentacoesTab()
+                   ~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 373, in __init__
+    self.init_ui()
+    ~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 448, in init_ui
+    self.btn_novo_utilizador.setCursor(Qt.PointingHandCursor)
+                                       ^^
+NameError: name 'Qt' is not defined
+2026-06-29T12:25:54 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T12:25:54 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T12:25:54 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T12:25:54 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T12:25:54 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T12:25:54 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T12:25:54 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T12:25:55 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T12:25:55 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T12:25:55 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T12:25:55 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T12:25:55 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T12:25:55 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T12:25:55 | ERROR | app_daily.interface.dash_main | dash_main | verificar_chaves_atraso:200 | Erro ao verificar chaves em atraso
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 188, in verificar_chaves_atraso
+    tem_atraso, qtd = ha_chaves_em_atraso()
+                      ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\controle\movimentacoes.py", line 1211, in ha_chaves_em_atraso
+    now = datetime.now()
+          ^^^^^^^^
+NameError: name 'datetime' is not defined. Did you forget to import 'datetime'?
+2026-06-29T12:25:59 | INFO | app_daily.interface.dash_main | dash_main | sair:322 | Encerrando aplicação via botão Sair
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | __init__:48 | Inicializando DashMain para utilizador=TIAlvorada login=admin admin=True
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | __init__:102 | Logo da aplicação carregado com sucesso
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:243 | Iniciando carregamento das abas principais
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:248 | Aba 'Movimentações' carregada com sucesso
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:256 | Aba 'Relatórios' carregada com sucesso
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:264 | Aba 'Utilizadores' carregada com sucesso
+2026-06-29T12:37:34 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-06-29T12:37:34 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-06-29T12:37:34 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-06-29T12:37:34 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-06-29T12:37:34 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-06-29T12:37:34 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:277 | Aba 'Administração' carregada com sucesso
+2026-06-29T12:37:34 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-06-29T12:37:34 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T12:37:34 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T12:37:34 | INFO | app_daily.interface.dash_main | dash_main | load_tabs:281 | Aba 'Logs' carregada com sucesso
+2026-06-29T12:37:54 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_29062026.log
+2026-06-29T12:37:54 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-06-29T12:38:02 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_29062026.log
+2026-06-29T12:38:02 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-06-29T12:38:12 | INFO | app_daily.interface.dash_main | dash_main | closeEvent:314 | Fechando DashMain

@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from datetime import datetime
-from PyQt5.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor
 import config
 
 ALERTA_HORAS = 6

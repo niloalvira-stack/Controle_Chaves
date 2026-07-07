@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from PyQt5.QtCore import QTimer
+from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtCore import QTimer
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 from autenticacao.helpers_autenticacao import get_db_connection
@@ -14,11 +14,10 @@ def formatar_data_br_dia(valor):
         return ""
     try:
         if isinstance(valor, datetime):
-            return valor.strftime("%d%m%Y")   # DDMMAAAA
-        return datetime.strptime(valor, "%Y-%m-%d").strftime("%d%m%Y")
+            return valor.strftime("%d/%m/%Y")
+        return datetime.strptime(str(valor), "%Y-%m-%d").strftime("%d/%m/%Y")
     except Exception:
         return str(valor)
-
 
 
 class RelatorioGraficosTab(QWidget):
@@ -31,20 +30,13 @@ class RelatorioGraficosTab(QWidget):
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas)
 
-        self.setLayout(layout)
-
         self.gerar_graficos()
 
-        # Atualiza a cada 30 segundos
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.gerar_graficos)
         self.timer.start(30000)
 
     def _buscar_dados(self):
-        """
-        Exemplo: quantidade de movimentações por dia (data_retirada).
-        Ajuste a query conforme o que você quiser mostrar no gráfico.
-        """
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -61,15 +53,11 @@ class RelatorioGraficosTab(QWidget):
         rows = cursor.fetchall()
         conn.close()
 
-        # Transforma em listas para plot
-        dias = [r[0] for r in rows]      # datetime.date
-        totais = [r[1] for r in rows]    # int
+        dias = [r[0] for r in rows]
+        totais = [r[1] for r in rows]
         return dias, totais
 
     def gerar_graficos(self):
-        """
-        Atualiza o gráfico com os dados atuais.
-        """
         self.fig.clear()
         ax = self.fig.add_subplot(111)
 
@@ -79,17 +67,15 @@ class RelatorioGraficosTab(QWidget):
             ax.text(0.5, 0.5, "Sem dados de movimentações.",
                     ha="center", va="center", transform=ax.transAxes)
         else:
-            # Converte datas para rótulos no formato dd/mm/yyyy
             labels = [formatar_data_br_dia(d) for d in dias]
             x = range(len(dias))
 
             ax.bar(x, totais)
-            ax.set_xticks(x)
+            ax.set_xticks(list(x))
             ax.set_xticklabels(labels, rotation=45, ha="right")
             ax.set_ylabel("Qtde de movimentações")
             ax.set_xlabel("Data de retirada")
             ax.set_title("Movimentações por dia")
-
             self.fig.tight_layout()
 
         self.canvas.draw()

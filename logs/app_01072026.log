@@ -1,0 +1,256 @@
+2026-07-01T10:13:18 | INFO | app_daily.interface.dash_main | dash_main | __init__:38 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:16:03 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:16:03 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 19, in __init__
+    self.tabs.addTab(RelatorioGeralTab(), "Geral")
+                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 82, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 136, in setup_ui
+    self._configurar_tabela()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 146, in _configurar_tabela
+    header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'ResizeToContents'
+2026-07-01T10:38:32 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:38:32 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 19, in __init__
+    self.tabs.addTab(RelatorioGeralTab(), "Geral")
+                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 82, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 136, in setup_ui
+    self._configurar_tabela()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_geral.py", line 154, in _configurar_tabela
+   self.table.setEditTriggers(QAbstractItemView.EditTrigger.)
+                               ^^^^^^^^^^^^^^^^^
+NameError: name 'QAbstractItemView' is not defined
+2026-07-01T10:41:26 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:41:29 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 20, in __init__
+    self.tabs.addTab(RelatorioPendenciasTab(), "Pendências")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_pendencias_tab.py", line 85, in __init__
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T10:41:56 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:41:56 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 20, in __init__
+    self.tabs.addTab(RelatorioPendenciasTab(), "Pendências")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_pendencias_tab.py", line 85, in __init__
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T10:45:24 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:45:25 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 20, in __init__
+    self.tabs.addTab(RelatorioPendenciasTab(), "Pendências")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_pendencias_tab.py", line 85, in __init__
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T10:50:52 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:50:53 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 21, in __init__
+    self.tabs.addTab(RelatorioPorPeriodoTab(), "Por Período")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_periodo_tab.py", line 84, in __init__
+    header.setSectionResizeMode(0, QHeaderView.Stretch)          # Chave
+                                   ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T10:55:25 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T10:55:25 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 21, in __init__
+    self.tabs.addTab(RelatorioPorPeriodoTab(), "Por Período")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_periodo_tab.py", line 89, in __init__
+    self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QTableWidget' has no attribute 'NoEditTriggers'. Did you mean: 'editTriggers'?
+2026-07-01T11:00:27 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T11:00:55 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 22, in __init__
+    self.tabs.addTab(RelatorioPorSalaTab(), "Por Sala")
+                     ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_sala_tab.py", line 102, in __init__
+    header.setSectionResizeMode(0, QHeaderView.Stretch)
+                                   ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:13:20 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T11:13:23 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:254 | Erro na aba Relatórios
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 247, in load_tabs
+    self.rel_tab = RelatoriosTab()
+                   ~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorios_tab.py", line 23, in __init__
+    self.tabs.addTab(RelatorioPorUsuarioTab(), "Por Usuário")
+                     ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\relatorios\relatorio_usuario_tab.py", line 72, in __init__
+    header.setSectionResizeMode(0, QHeaderView.Stretch)
+                                   ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:32:07 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T11:32:12 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:273 | Erro na aba Utilizadores
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 267, in load_tabs
+    self.util_tab = UtilizadoresTab(self.mov_tab)
+                    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Controle_Chaves\admin\utilizadores_tab.py", line 127, in __init__
+    self._setup_ui()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\admin\utilizadores_tab.py", line 139, in _setup_ui
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:32:28 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:292 | Erro nas abas de admin
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 282, in load_tabs
+    self.admin_tab = AdminTab({
+                     ~~~~~~~~^^
+        "login": self.user_login,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+        "nome": self.user_nome,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+        "is_admin": True
+        ^^^^^^^^^^^^^^^^
+    })
+    ^^
+  File "C:\Controle_Chaves\admin\admin.py", line 21, in __init__
+    self.usuarios_tab = UsuariosTab()
+                        ~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\admin\usuarios.py", line 86, in __init__
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:32:40 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:305 | Logout realizado para TIAlvorada (admin)
+2026-07-01T11:49:10 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T11:49:39 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:273 | Erro na aba Utilizadores
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 267, in load_tabs
+    self.util_tab = UtilizadoresTab(self.mov_tab)
+                    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Controle_Chaves\admin\utilizadores_tab.py", line 127, in __init__
+    self._setup_ui()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\admin\utilizadores_tab.py", line 139, in _setup_ui
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:50:06 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:292 | Erro nas abas de admin
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 282, in load_tabs
+    self.admin_tab = AdminTab({
+                     ~~~~~~~~^^
+        "login": self.user_login,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+        "nome": self.user_nome,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+        "is_admin": True
+        ^^^^^^^^^^^^^^^^
+    })
+    ^^
+  File "C:\Controle_Chaves\admin\admin.py", line 21, in __init__
+    self.usuarios_tab = UsuariosTab()
+                        ~~~~~~~~~~~^^
+  File "C:\Controle_Chaves\admin\usuarios.py", line 86, in __init__
+    self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                                                       ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'QHeaderView' has no attribute 'Stretch'
+2026-07-01T11:50:30 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:305 | Logout realizado para TIAlvorada (admin)
+2026-07-01T15:14:45 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T15:15:20 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-07-01T15:15:20 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-07-01T15:15:20 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-07-01T15:15:20 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-07-01T15:15:20 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-07-01T15:15:20 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-07-01T15:15:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-07-01T15:15:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_01072026.log
+2026-07-01T15:15:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-07-01T15:15:32 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:302 | Logout realizado para TIAlvorada (admin)
+2026-07-01T15:18:19 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T15:18:20 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-07-01T15:18:20 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-07-01T15:18:20 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-07-01T15:18:20 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-07-01T15:18:20 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-07-01T15:18:20 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-07-01T15:18:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-07-01T15:18:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_01072026.log
+2026-07-01T15:18:20 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-07-01T15:18:42 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_01072026.log
+2026-07-01T15:18:42 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-07-01T15:18:51 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_01072026.log
+2026-07-01T15:18:51 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-07-01T15:18:58 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Técnico arquivo=C:\Controle_Chaves\logs\app_01072026.log
+2026-07-01T15:18:58 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Técnico
+2026-07-01T15:21:54 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:302 | Logout realizado para TIAlvorada (admin)
+2026-07-01T15:24:47 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T15:24:48 | INFO | app_daily.admin.predios | predios | __init__:40 | Inicializando aba de gestão de prédios
+2026-07-01T15:24:48 | INFO | app_daily.admin.predios | predios | load_predios:113 | Carregando lista de prédios
+2026-07-01T15:24:48 | INFO | app_daily.admin.predios | predios | load_predios:123 | Consulta de prédios executada com sucesso: 2 registro(s)
+2026-07-01T15:24:48 | INFO | app_daily.admin.anexos | anexos | __init__:65 | Inicializando aba de gestão de anexos
+2026-07-01T15:24:48 | INFO | app_daily.admin.anexos | anexos | load_anexos:130 | Carregando lista de anexos
+2026-07-01T15:24:48 | INFO | app_daily.admin.anexos | anexos | load_anexos:149 | Consulta de anexos executada com sucesso: 3 registro(s)
+2026-07-01T15:24:48 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | __init__:24 | Inicializando aba de visualização de logs
+2026-07-01T15:24:48 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:99 | Carregando log na interface: tipo=Auditoria arquivo=C:\Controle_Chaves\logs\app_audit_01072026.log
+2026-07-01T15:24:48 | INFO | app_daily.admin.log_viewer_tab | log_viewer_tab | carregar_logs:121 | Log carregado com sucesso: tipo=Auditoria
+2026-07-01T15:25:11 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:302 | Logout realizado para TIAlvorada (admin)
+2026-07-01T15:36:53 | INFO | app_daily.interface.dash_main | dash_main | __init__:39 | Inicializando DashMain para TIAlvorada (admin)
+2026-07-01T15:36:54 | ERROR | app_daily.interface.dash_main | dash_main | load_tabs:288 | Erro nas abas de admin
+Traceback (most recent call last):
+  File "C:\Controle_Chaves\interface\dash_main.py", line 277, in load_tabs
+    self.admin_tab = AdminTab({
+                     ~~~~~~~~^^
+        "login": self.user_login,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+        "nome": self.user_nome,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+        "is_admin": True
+        ^^^^^^^^^^^^^^^^
+    })
+    ^^
+  File "C:\Controle_Chaves\admin\admin.py", line 22, in __init__
+    self.salas_tab = SalasTab(current_user=self.current_user)
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SalasTab.__init__() got an unexpected keyword argument 'current_user'
+2026-07-01T15:37:09 | INFO | app_daily.interface.dash_main | dash_main | _executar_logout:302 | Logout realizado para TIAlvorada (admin)

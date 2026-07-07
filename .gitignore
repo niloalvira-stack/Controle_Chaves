@@ -1,7 +1,59 @@
-venv/
-*.pyc
+# Python
 __pycache__/
-controle_chaves.db
-.DS_Store
-*.logconfig.ini
+*.py[cod]
+
+# Virtualenv
+.venv/
+venv/
+env/
+ENV/
+
+# Build / PyInstaller
+build/
+dist/
+*.manifest
+*.pyz
+*.pkg
+*.toc
+warn-*.txt
+xref-*.html
+
+# Logs
+*.log
+log.txt
+logs/
+
+# Config local
 /config.ini
+config.ini
+.env
+.env.*
+
+# Banco / dumps
+*.dump
+*.backup
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Saídas geradas localmente
+*.pdf
+predios.csv
+utilizadores.csv
+salas.pdf
+
+# Manter versionado
+!config.example.ini
+!assets/
+!icons/
+!*.spec
+
+controle_chaves.sql

@@ -1,15 +1,18 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox, QComboBox, QLabel, QHeaderView, QApplication, QAbstractItemView
-)
-from PyQt6.QtCore import QTimer, Qt
-from datetime import datetime
 import csv
+from datetime import datetime
+
+from PyQt6.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QTableWidget, QFileDialog,
+    QMessageBox, QComboBox, QLabel, QHeaderView, QAbstractItemView
+)
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 
-from autenticacao.helpers_autenticacao import get_db_connection
+from .base_relatorio_tab import BaseRelatorioTab
+from .workers import QueryThread
+from utils.ui_buttons import criar_botao_padrao
 
 
 def formatar_data_br(valor):
@@ -18,51 +21,72 @@ def formatar_data_br(valor):
     try:
         if isinstance(valor, datetime):
             return valor.strftime("%d/%m/%Y %H:%M:%S")
-        return datetime.strptime(valor, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
+        return datetime.strptime(
+            str(valor),
+            "%Y-%m-%d %H:%M:%S"
+        ).strftime("%d/%m/%Y %H:%M:%S")
     except Exception:
         return str(valor)
 
 
-class RelatorioPorUsuarioTab(QWidget):
+class RelatorioPorUsuarioTab(BaseRelatorioTab):
     def __init__(self):
         super().__init__()
-        self._rows_cache = []
-        layout = QVBoxLayout(self)
+        self._usuarios_loader = None
 
-        # Filtro
+        layout = QVBoxLayout(self)
         filtro_layout = QHBoxLayout()
+        # ✅ Renomeado para "Utilizador:" como você pediu
         filtro_layout.addWidget(QLabel("Utilizador:"))
+
         self.cb_usuario = QComboBox()
+        # ✅ Ajustes de largura para ver o nome completo
+        self.cb_usuario.setMinimumWidth(380)
+        self.cb_usuario.view().setMinimumWidth(400)
+        self.cb_usuario.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         filtro_layout.addWidget(self.cb_usuario)
 
-        self.btn_filtrar = QPushButton("Filtrar")
-        self.btn_filtrar.setObjectName("btnFiltrarUsuario")
-        self.btn_filtrar.clicked.connect(self.load_relatorio)
+        # ✅ CRIA O BOTÃO QUE ESTAVA FALTANDO
+        self.btn_filtrar = criar_botao_padrao(
+            "Filtrar",
+            role="primary",
+            slot=self.load_relatorio
+        )
         filtro_layout.addWidget(self.btn_filtrar)
 
-        # contador
         self.lbl_total = QLabel("0 registros")
         filtro_layout.addWidget(self.lbl_total)
 
         filtro_layout.addStretch()
         layout.addLayout(filtro_layout)
 
-        # Botões exportação
+        filtro_layout.addWidget(self.btn_filtrar)
+
+        self.lbl_total = QLabel("0 registros")
+        filtro_layout.addWidget(self.lbl_total)
+
+        filtro_layout.addStretch()
+        layout.addLayout(filtro_layout)
+
         btns_layout = QHBoxLayout()
-        self.btn_exportar = QPushButton("Exportar para CSV")
-        self.btn_exportar.setObjectName("btnExportarUsuarioCsv")
-        self.btn_exportar.clicked.connect(self.exportar_csv)
+
+        self.btn_exportar = criar_botao_padrao(
+            "Exportar para CSV",
+            role="secondary",
+            slot=self.exportar_csv
+        )
         btns_layout.addWidget(self.btn_exportar)
 
-        self.btn_exportar_pdf = QPushButton("Exportar para PDF")
-        self.btn_exportar_pdf.setObjectName("btnExportarUsuarioPdf")
-        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
+        self.btn_exportar_pdf = criar_botao_padrao(
+            "Exportar para PDF",
+            role="success",
+            slot=self.exportar_pdf
+        )
         btns_layout.addWidget(self.btn_exportar_pdf)
 
         btns_layout.addStretch()
         layout.addLayout(btns_layout)
 
-        # Tabela
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(
@@ -78,101 +102,40 @@ class RelatorioPorUsuarioTab(QWidget):
 
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-
         layout.addWidget(self.table)
-        self.setLayout(layout)
-        self.table.setRowCount(0)
+
+    def carregar_inicial(self):
+        if self._ja_carregou:
+            return
+        self._ja_carregou = True
         self.load_usuarios()
-
-        # Auto-refresh mais leve
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.refresh)
-        self.timer.start(10000)
-
-        self.setStyleSheet("""
-            QPushButton {
-                padding: 10px 24px;
-                min-height: 34px;
-                min-width: 140px;
-                border-radius: 6px;
-                border: 1px solid #888;
-                font-weight: 500;
-            }
-
-            QPushButton#btnFiltrarUsuario {
-                background-color: #f9a825;
-                color: #333333;
-                border: 1px solid #f57f17;
-            }
-            QPushButton#btnFiltrarUsuario:hover {
-                background-color: #fbc02d;
-            }
-            QPushButton#btnFiltrarUsuario:pressed {
-                background-color: #f57f17;
-            }
-
-            QPushButton#btnExportarUsuarioCsv {
-                background-color: #2e7d32;
-                color: white;
-                border: 1px solid #1b5e20;
-            }
-            QPushButton#btnExportarUsuarioCsv:hover {
-                background-color: #388e3c;
-            }
-            QPushButton#btnExportarUsuarioCsv:pressed {
-                background-color: #1b5e20;
-            }
-
-            QPushButton#btnExportarUsuarioPdf {
-                background-color: #1565c0;
-                color: white;
-                border: 1px solid #0d47a1;
-            }
-            QPushButton#btnExportarUsuarioPdf:hover {
-                background-color: #1976d2;
-            }
-            QPushButton#btnExportarUsuarioPdf:pressed {
-                background-color: #0d47a1;
-            }
-        """)
-
-    def _get_dash_main(self):
-        app = QApplication.instance()
-        if not app:
-            return None
-        for widget in app.topLevelWidgets():
-            if widget.__class__.__name__ == "DashMain":
-                return widget
-        return None
-
-    def refresh(self):
-        usuario_id_atual = self.cb_usuario.currentData()
-        self.load_usuarios()
-        if usuario_id_atual is not None:
-            for idx in range(self.cb_usuario.count()):
-                if self.cb_usuario.itemData(idx) == usuario_id_atual:
-                    self.cb_usuario.setCurrentIndex(idx)
-                    break
-        self.load_relatorio()
 
     def load_usuarios(self):
-        usuario_id_atual = self.cb_usuario.currentData()
-        self.cb_usuario.blockSignals(True)
-        self.cb_usuario.clear()
-        self.cb_usuario.addItem("[Selecione um utilizador]", None)
+        if self._usuarios_loader is not None:
+            return
 
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("""
+        sql = """
             SELECT DISTINCT u.id, u.nome
             FROM utilizadores u
             JOIN movimentacoes m ON m.utilizador_id = u.id
             ORDER BY u.nome
-        """)
-        rows = c.fetchall()
-        conn.close()
+        """
 
-        for uid, nome in rows:
+        self._usuarios_loader = QueryThread(sql, parent=self)
+        self._usuarios_loader.loaded.connect(self._on_usuarios_loaded)
+        self._usuarios_loader.error.connect(self._on_error)
+        self._usuarios_loader.finished.connect(self._on_usuarios_finished)
+        self._usuarios_loader.finished.connect(self._usuarios_loader.deleteLater)
+        self._usuarios_loader.start()
+
+    def _on_usuarios_loaded(self, rows):
+        usuario_id_atual = self.cb_usuario.currentData()
+
+        self.cb_usuario.blockSignals(True)
+        self.cb_usuario.clear()
+        self.cb_usuario.addItem("[Selecione um utilizador]", None)
+
+        for uid, nome in rows or []:
             if isinstance(nome, (bytes, bytearray)):
                 nome = nome.decode("utf-8", errors="ignore")
             self.cb_usuario.addItem(nome or "", uid)
@@ -185,8 +148,10 @@ class RelatorioPorUsuarioTab(QWidget):
 
         self.cb_usuario.blockSignals(False)
 
+    def _on_usuarios_finished(self):
+        self._usuarios_loader = None
+
     def _query_base(self):
-        # Mesma lógica de COALESCE de antes, adaptada para %s. [web:22][web:103]
         return """
             SELECT m.chave,
                    COALESCE(u.nome, m.usuario) AS utilizador,
@@ -200,50 +165,43 @@ class RelatorioPorUsuarioTab(QWidget):
             ORDER BY m.data_retirada DESC
         """
 
-    def _buscar_dados(self):
+    def load_relatorio(self):
+        if self._carregando:
+            return
+
         idx = self.cb_usuario.currentIndex()
         usuario_id = self.cb_usuario.itemData(idx)
         usuario_nome = self.cb_usuario.currentText()
 
-        if usuario_id is None or self.cb_usuario.currentText().startswith("[Selecione"):
+        if usuario_id is None or usuario_nome.startswith("[Selecione"):
             self._rows_cache = []
-            return []
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(self._query_base(), (usuario_id, usuario_nome))
-        rows = cursor.fetchall()
-        conn.close()
-        self._rows_cache = rows
-        return rows
-
-    def load_relatorio(self):
-        try:
-            rows = self._buscar_dados()
+            self.table.clearContents()
             self.table.setRowCount(0)
+            self.lbl_total.setText("0 registros")
+            return
 
-            if not rows:
-                self.lbl_total.setText("0 registros")
-                return
+        self.btn_filtrar.setEnabled(False)
+        self._iniciar_query(
+            self._query_base(),
+            (usuario_id, usuario_nome),
+            on_loaded=self._on_loaded
+        )
 
-            self.table.setRowCount(len(rows))
-            for i, row in enumerate(rows):
-                for j, val in enumerate(row):
-                    if j in (3, 4):  # datas
-                        val = formatar_data_br(val)
-                    item = QTableWidgetItem(str(val) if val else "")
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.table.setItem(i, j, item)
+    def _on_loaded(self, rows):
+        self._rows_cache = rows or []
+        self._preencher_tablewidget(
+            self.table,
+            self._rows_cache,
+            date_indexes={3, 4},
+            formatter=formatar_data_br
+        )
+        self.lbl_total.setText(f"{len(self._rows_cache)} registros")
 
-            self.lbl_total.setText(f"{len(rows)} registros")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao carregar relatório:\n{e}")
+    def _on_finished(self):
+        super()._on_finished()
+        self.btn_filtrar.setEnabled(True)
 
     def exportar_csv(self):
-        if not self._rows_cache:
-            self._buscar_dados()
-
         if not self._rows_cache:
             QMessageBox.information(self, "Exportar CSV", "Não há dados para exportar.")
             return
@@ -261,9 +219,12 @@ class RelatorioPorUsuarioTab(QWidget):
         if not caminho:
             return
 
+        if not caminho.lower().endswith(".csv"):
+            caminho += ".csv"
+
         try:
             with open(caminho, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f, delimiter=';')
+                writer = csv.writer(f, delimiter=";")
                 writer.writerow(["Chave", "Utilizador", "Status", "Retirada", "Devolução"])
                 for chave, utilizador, status, retirada, devolucao in self._rows_cache:
                     writer.writerow([
@@ -275,8 +236,10 @@ class RelatorioPorUsuarioTab(QWidget):
                     ])
 
             dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_status_message("Relatório por utilizador exportado para CSV.")
+            show_status = getattr(dash, "show_status_message", None)
+
+            if callable(show_status):
+                show_status("Relatório por utilizador exportado para CSV.")
             else:
                 QMessageBox.information(self, "Exportar CSV", "Exportação concluída.")
         except Exception as e:
@@ -284,38 +247,46 @@ class RelatorioPorUsuarioTab(QWidget):
 
     def exportar_pdf(self):
         if not self._rows_cache:
-            self._buscar_dados()
-
-        if not self._rows_cache:
             QMessageBox.information(self, "Exportar PDF", "Não há dados para exportar.")
             return
 
         usuario_nome = self.cb_usuario.currentText() or "Usuário"
         ts = datetime.now().strftime("%Y%m%d_%H%M")
+        nome_sugestao = f"relatorio_usuario_{usuario_nome}_{ts}.pdf".replace(" ", "_")
+
         caminho, _ = QFileDialog.getSaveFileName(
             self,
             "Salvar relatório por utilizador",
-            f"relatorio_usuario_{usuario_nome}_{ts}.pdf".replace(" ", "_"),
+            nome_sugestao,
             "PDF Files (*.pdf)"
         )
         if not caminho:
             return
 
+        if not caminho.lower().endswith(".pdf"):
+            caminho += ".pdf"
+
         try:
-            dados = []
-            headers = ["Chave", "Utilizador", "Status", "Retirada", "Devolução"]
-            dados.append(headers)
+            styles = getSampleStyleSheet()
+            dados = [[
+                Paragraph("Chave", styles["BodyText"]),
+                Paragraph("Utilizador", styles["BodyText"]),
+                Paragraph("Status", styles["BodyText"]),
+                Paragraph("Retirada", styles["BodyText"]),
+                Paragraph("Devolução", styles["BodyText"]),
+            ]]
 
             for chave, utilizador, status, retirada, devolucao in self._rows_cache:
                 dados.append([
-                    chave or "",
-                    utilizador or "",
-                    status or "",
-                    formatar_data_br(retirada),
-                    formatar_data_br(devolucao),
+                    Paragraph(str(chave or ""), styles["BodyText"]),
+                    Paragraph(str(utilizador or ""), styles["BodyText"]),
+                    Paragraph(str(status or ""), styles["BodyText"]),
+                    Paragraph(formatar_data_br(retirada), styles["BodyText"]),
+                    Paragraph(formatar_data_br(devolucao), styles["BodyText"]),
                 ])
 
             doc = SimpleDocTemplate(caminho, pagesize=A4)
+
             tabela = Table(dados, repeatRows=1)
             tabela.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
@@ -326,18 +297,16 @@ class RelatorioPorUsuarioTab(QWidget):
                 ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
                 ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]))
 
-            elementos = [
-                Paragraph(f"Relatório por utilizador: {usuario_nome}", None),
-                Spacer(1, 8),
-                tabela,
-            ]
-            doc.build(elementos)
+            doc.build([Paragraph(f"Relatório por utilizador: {usuario_nome}", styles["Title"]), Spacer(1, 8), tabela])
 
             dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_status_message("Relatório por utilizador exportado para PDF.")
+            show_status = getattr(dash, "show_status_message", None)
+
+            if callable(show_status):
+                show_status("Relatório por utilizador exportado para PDF.")
             else:
                 QMessageBox.information(self, "Exportar PDF", "Exportação concluída.")
         except Exception as e:

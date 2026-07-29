@@ -56,7 +56,10 @@ class UsuarioDialog(QDialog):
             self.senha_edit.setPlaceholderText("Preencha apenas para alterar")
             self.confirmar_senha_edit.setPlaceholderText("Preencha apenas para alterar")
 
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         layout.addRow(self.buttons)
@@ -211,7 +214,7 @@ class UsuariosTab(QWidget):
 
     def add_user(self):
         dialog = UsuarioDialog(parent=self, editar=False)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
         data = dialog.get_data()
@@ -245,18 +248,11 @@ class UsuariosTab(QWidget):
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "SELECT COUNT(*) FROM usuarios WHERE login = %s",
-                (data["login"],)
-            )
-            exists = self._fetch_scalar(cursor)
-            if exists:
-                self._show_error("Já existe um usuário com este login.")
-                return
-
-            cursor.execute(
                 """
                 INSERT INTO usuarios (login, nome, senha, is_admin, primeiro_login)
                 VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (login) DO NOTHING
+                RETURNING id
                 """,
                 (
                     data["login"],
@@ -266,13 +262,22 @@ class UsuariosTab(QWidget):
                     bool(data["primeiro_login"]),
                 )
             )
+
+            resultado = cursor.fetchone()
+            if resultado is None:
+                conn.rollback()
+                self._show_error("Já existe um usuário com este login.")
+                return
+
             conn.commit()
             self.load_users()
             self._show_success("Usuário cadastrado com sucesso.")
+
         except Exception as e:
             conn.rollback()
             logger.exception("Erro ao cadastrar usuário")
             self._show_error(f"Erro ao cadastrar usuário: {e}")
+
         finally:
             cursor.close()
             conn.close()
@@ -302,7 +307,7 @@ class UsuariosTab(QWidget):
             editar=True
         )
 
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
         data = dialog.get_data()
@@ -410,15 +415,15 @@ class UsuariosTab(QWidget):
 
         nome = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
 
-        confirm = QMessageBox.question(
+        resposta = QMessageBox.question(
             self,
             "Confirmar exclusão",
             f"Deseja realmente excluir o usuário '{nome}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
 
-        if confirm != QMessageBox.Yes:
+        if resposta != QMessageBox.StandardButton.Yes:
             return
 
         conn = get_connection()

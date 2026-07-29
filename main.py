@@ -8,6 +8,7 @@ from autenticacao.login_window import LoginWindow
 from autenticacao.session import session_manager
 from interface.dash_main import DashMain
 from utils.utils_log import log_acao
+from pathlib import Path
 
 
 class MainApp:
@@ -15,6 +16,16 @@ class MainApp:
         self.app = QApplication(sys.argv)
         self.login_window = None
         self.dash_main = None
+
+        self.carregar_qss_global()
+
+    def carregar_qss_global(self):
+        try:
+            qss_path = Path(__file__).parent / "styles" / "app.qss"
+            if qss_path.exists():
+                self.app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"Erro ao carregar QSS global: {e}")
 
     def mostrar_login(self):
         self.login_window = LoginWindow()
@@ -51,14 +62,12 @@ class MainApp:
                     details="encerramento_de_sessao",
                 )
         except Exception:
-            print("Erro ao registrar logout:")
             print(traceback.format_exc())
 
         try:
             if hasattr(session_manager, "logout"):
                 session_manager.logout()
         except Exception:
-            print("Erro ao encerrar sessão:")
             print(traceback.format_exc())
 
         if self.dash_main is not None:
@@ -66,7 +75,6 @@ class MainApp:
             self.dash_main = None
 
         self.mostrar_login()
-
     def run(self):
         self.mostrar_login()
         sys.exit(self.app.exec())

@@ -1,5 +1,6 @@
 # database_module.py
 
+import traceback
 import psycopg
 from psycopg.rows import dict_row
 
@@ -7,9 +8,6 @@ from utils.config_app import get_db_config
 
 
 def get_connection():
-    """
-    Abre conexão com PostgreSQL usando os dados do config.ini.
-    """
     cfg = get_db_config()
 
     try:
@@ -24,17 +22,11 @@ def get_connection():
         return conn
     except psycopg.Error as e:
         print(f"Erro ao conectar no banco de dados: {e}")
+        traceback.print_exc()
         return None
 
 
 def execute_query(query, params=(), fetchone=False):
-    """
-    Executa query no PostgreSQL.
-
-    - SELECT com fetchone=True: retorna um dict ou None
-    - SELECT com fetchone=False: retorna lista de dicts
-    - INSERT/UPDATE/DELETE: faz commit e retorna None
-    """
     conn = get_connection()
     if conn is None:
         raise Exception("Não foi possível conectar ao banco de dados.")
@@ -54,6 +46,7 @@ def execute_query(query, params=(), fetchone=False):
     except Exception as e:
         conn.rollback()
         print(f"Erro ao executar query: {e}")
+        traceback.print_exc()
         raise
     finally:
         conn.close()

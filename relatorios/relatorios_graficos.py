@@ -1,81 +1,106 @@
-from datetime import datetime
-
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtCore import QTimer
-
+# relatorios/relatorios_graficos.py
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QMessageBox
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from autenticacao.helpers_autenticacao import get_db_connection
+from .base_relatorio_tab import BaseRelatorioTab
+from utils.ui_buttons import criar_botao_padrao
 
 
-def formatar_data_br_dia(valor):
-    if not valor:
-        return ""
-    try:
-        if isinstance(valor, datetime):
-            return valor.strftime("%d/%m/%Y")
-        return datetime.strptime(str(valor), "%Y-%m-%d").strftime("%d/%m/%Y")
-    except Exception:
-        return str(valor)
-
-
-class RelatorioGraficosTab(QWidget):
+class RelatorioGraficosTab(BaseRelatorioTab):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Relatórios Gráficos")
+
         layout = QVBoxLayout(self)
 
-        self.fig = Figure(figsize=(8, 4))
-        self.canvas = FigureCanvas(self.fig)
+        topo = QHBoxLayout()
+        self.btn_atualizar = criar_botao_padrao(
+            "Atualizar gráficos",
+            role="primary",
+            slot=self.load_relatorio
+        )
+        topo.addWidget(self.btn_atualizar)
+        topo.addStretch()
+        layout.addLayout(topo)
+
+        self.figure = Figure(figsize=(9, 5), tight_layout=True)
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
+
         layout.addWidget(self.canvas)
 
-        self.gerar_graficos()
+        self._render_empty_chart()
 
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.gerar_graficos)
-        self.timer.start(30000)
+    def _render_empty_chart(self):
+        self.ax.clear()
+        self.ax.set_title("Movimentações por Sala")
+        self.ax.set_xlabel("Sala")
+        self.ax.set_ylabel("Quantidade")
+        self.ax.text(
+            0.5, 0.5,
+            "Nenhum dado carregado",
+            ha="center", va="center",
+            transform=self.ax.transAxes
+        )
+        self.canvas.draw_idle()
 
-    def _buscar_dados(self):
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    def _query_base(self):
+        return """
+            SELECT COALESCE(NULLIF(TRIM(s.nome), ''), 'Sem nome') AS sala,
+                   COUNT(*) AS total
+            FROM movimentacoes m
+            INNER JOIN salas s ON s.id = m.sala_id
+            GROUP BY COALESCE(NULLIF(TRIM(s.nome), ''), 'Sem nome')
+            ORDER BY total DESC, sala
+        """
 
-        cursor.execute("""
-            SELECT
-                DATE(data_retirada) AS dia,
-                COUNT(*) AS total
-            FROM movimentacoes
-            WHERE data_retirada IS NOT NULL
-            GROUP BY DATE(data_retirada)
-            ORDER BY DATE(data_retirada)
-        """)
+    def load_relatorio(self):
+        if self._carregando:
+            return
 
-        rows = cursor.fetchall()
-        conn.close()
+        self.btn_atualizar.setEnabled(False)
+        self._iniciar_query(self._query_base(), on_loaded=self._on_loaded)
 
-        dias = [r[0] for r in rows]
-        totais = [r[1] for r in rows]
-        return dias, totais
+    def _on_loaded(self, rows):
+        self._rows_cache = rows or []
+        self._plotar_grafico(self._rows_cache)
 
-    def gerar_graficos(self):
-        self.fig.clear()
-        ax = self.fig.add_subplot(111)
+    def _on_finished(self):
+        super()._on_finished()
+        self.btn_atualizar.setEnabled(True)
 
-        dias, totais = self._buscar_dados()
+    def _plotar_grafico(self, rows):
+        self.ax.clear()
 
-        if not dias:
-            ax.text(0.5, 0.5, "Sem dados de movimentações.",
-                    ha="center", va="center", transform=ax.transAxes)
-        else:
-            labels = [formatar_data_br_dia(d) for d in dias]
-            x = range(len(dias))
+        if not rows:
+            self._render_empty_chart()
+            return
 
-            ax.bar(x, totais)
-            ax.set_xticks(list(x))
-            ax.set_xticklabels(labels, rotation=45, ha="right")
-            ax.set_ylabel("Qtde de movimentações")
-            ax.set_xlabel("Data de retirada")
-            ax.set_title("Movimentações por dia")
-            self.fig.tight_layout()
+        salas = [str(row[0]) for row in rows]
+        totais = [int(row[1]) for row in rows]
 
-        self.canvas.draw()
+        bars = self.ax.bar(salas, totais, color="#1976d2")
+
+        self.ax.set_title("Movimentações por Sala")
+        self.ax.set_xlabel("Sala")
+        self.ax.set_ylabel("Quantidade")
+        self.ax.tick_params(axis="x", labelrotation=35)
+
+        for label in self.ax.get_xticklabels():
+            label.set_ha("right")
+
+        for bar, total in zip(bars, totais):
+            self.ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                str(total),
+                ha="center",
+                va="bottom"
+            )
+
+        self.figure.tight_layout()
+        self.canvas.draw_idle()
+
+    def _on_error(self, msg):
+        QMessageBox.critical(self, "Erro", f"Erro ao carregar gráficos:\n{msg}")
+        self._render_empty_chart()

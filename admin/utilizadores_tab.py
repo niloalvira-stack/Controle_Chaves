@@ -4,17 +4,19 @@ import logging
 from contextlib import closing
 
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, QSize
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QFileDialog, QDialog, QFormLayout, QLineEdit,
-    QComboBox, QHeaderView, QDateEdit
+    QComboBox, QHeaderView, QDateEdit, QAbstractItemView, QLabel,
+    QDialogButtonBox
 )
 
 from email_validator import validate_email, EmailNotValidError
 
 from autenticacao import get_current_user, validar_login, is_admin
 from utils.utils_log import log_acao
+from utils.button_style import aplicar_estilo_botao_padrao
 from database_module import get_connection, execute_query
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ class UtilizadorDialog(QDialog):
 
     def _setup_ui(self):
         self.setWindowTitle("Utilizador")
+
         layout = QFormLayout(self)
 
         self.edit_nome = QLineEdit()
@@ -58,15 +61,21 @@ class UtilizadorDialog(QDialog):
         layout.addRow("Ativo:", self.combo_ativo)
         layout.addRow("Válido até:", self.date_fim)
 
-        btn_box = QHBoxLayout()
-        self.btn_salvar = QPushButton("Salvar")
-        self.btn_cancelar = QPushButton("Cancelar")
-        btn_box.addWidget(self.btn_salvar)
-        btn_box.addWidget(self.btn_cancelar)
-        layout.addRow(btn_box)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
 
-        self.btn_salvar.clicked.connect(self.accept)
-        self.btn_cancelar.clicked.connect(self.reject)
+        btn_salvar = self.button_box.button(QDialogButtonBox.StandardButton.Save)
+        btn_cancelar = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+
+        if btn_salvar:
+            aplicar_estilo_botao_padrao(btn_salvar, "#0d6efd", "#ffffff")
+        if btn_cancelar:
+            aplicar_estilo_botao_padrao(btn_cancelar, "#6c757d", "#ffffff")
+
+        layout.addRow(self.button_box)
 
     def _carregar_dados(self):
         if not self.dados:
@@ -86,8 +95,12 @@ class UtilizadorDialog(QDialog):
         if data_fim:
             if isinstance(data_fim, str):
                 try:
-                    ano, mes, dia = map(int, data_fim.split("-"))
-                    qd = QDate(ano, mes, dia)
+                    if "/" in data_fim:
+                        dia, mes, ano = map(int, data_fim.split("/"))
+                        qd = QDate(ano, mes, dia)
+                    else:
+                        ano, mes, dia = map(int, data_fim.split("-"))
+                        qd = QDate(ano, mes, dia)
                 except Exception:
                     qd = QDate.currentDate()
             else:
@@ -118,40 +131,75 @@ class UtilizadorDialog(QDialog):
 class UtilizadoresTab(QWidget):
     def __init__(self, movimentacoes_tab=None, parent=None):
         super().__init__(parent)
+
         self.icon_ativo = QIcon("icons/ok.png")
         self.icon_inativo = QIcon("icons/x.png")
-
         self.movimentacoes_tab = movimentacoes_tab
+
         self._setup_ui()
         self.carregar_dados()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(15, 15, 15, 15)
+        layout_principal.setSpacing(15)
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(
-            ["ID", "Nome", "E-mail", "Vínculo", "Ativo", "Válido até"]
-        )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        titulo = QLabel("Gestão de Utilizadores")
+        layout_principal.addWidget(titulo)
 
-        btn_layout = QHBoxLayout()
+        layout_botoes = QHBoxLayout()
+        layout_botoes.setSpacing(12)
+        layout_botoes.setContentsMargins(0, 0, 0, 15)
+
         self.btn_novo = QPushButton("Novo")
         self.btn_editar = QPushButton("Editar")
         self.btn_excluir = QPushButton("Excluir")
         self.btn_ativar = QPushButton("Ativar/Desativar")
         self.btn_exportar = QPushButton("Exportar CSV")
 
-        btn_layout.addWidget(self.btn_novo)
-        btn_layout.addWidget(self.btn_editar)
-        btn_layout.addWidget(self.btn_excluir)
-        btn_layout.addWidget(self.btn_ativar)
-        btn_layout.addWidget(self.btn_exportar)
+        aplicar_estilo_botao_padrao(self.btn_novo, "#0d6efd", "#ffffff")
+        aplicar_estilo_botao_padrao(self.btn_editar, "#fd7e14", "#ffffff")
+        aplicar_estilo_botao_padrao(self.btn_excluir, "#dc3545", "#ffffff")
+        aplicar_estilo_botao_padrao(self.btn_ativar, "#6f42c1", "#ffffff")
+        aplicar_estilo_botao_padrao(self.btn_exportar, "#198754", "#ffffff")
 
-        layout.addWidget(self.table)
-        layout.addLayout(btn_layout)
+        self._definir_icone(self.btn_novo, "recursos/icones/adicionar.png")
+        self._definir_icone(self.btn_editar, "recursos/icones/editar.png")
+        self._definir_icone(self.btn_excluir, "recursos/icones/excluir.png")
+        self._definir_icone(self.btn_ativar, "recursos/icones/ativar.png")
+        self._definir_icone(self.btn_exportar, "recursos/icones/csv.png")
+
+        layout_botoes.addWidget(self.btn_novo)
+        layout_botoes.addWidget(self.btn_editar)
+        layout_botoes.addWidget(self.btn_excluir)
+        layout_botoes.addWidget(self.btn_ativar)
+        layout_botoes.addStretch()
+        layout_botoes.addWidget(self.btn_exportar)
+
+        layout_principal.addLayout(layout_botoes)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Nome", "E-mail", "Vínculo", "Ativo", "Válido até"]
+        )
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+
+        self.table.setColumnHidden(0, True)
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
+
+        layout_principal.addWidget(self.table)
 
         self.btn_novo.clicked.connect(self.novo_utilizador)
         self.btn_editar.clicked.connect(self.editar_utilizador)
@@ -159,15 +207,17 @@ class UtilizadoresTab(QWidget):
         self.btn_ativar.clicked.connect(self.ativar_desativar_utilizador)
         self.btn_exportar.clicked.connect(self.exportar_csv)
 
+    def _definir_icone(self, botao, caminho):
+        icone = QIcon(caminho)
+        if not icone.isNull():
+            botao.setIcon(icone)
+            botao.setIconSize(QSize(16, 16))
+
     def _email_valido_completo(self, email: str):
         email = (email or "").strip()
 
         if not email:
-            QMessageBox.warning(
-                self,
-                "Dados incompletos",
-                "E-mail é obrigatório.",
-            )
+            QMessageBox.warning(self, "Dados incompletos", "E-mail é obrigatório.")
             return False, ""
 
         try:
@@ -201,6 +251,11 @@ class UtilizadoresTab(QWidget):
             return False, email_norm
 
         return True, email_norm.lower()
+
+    def _decode_if_bytes(self, valor):
+        if isinstance(valor, (bytes, bytearray)):
+            return valor.decode("utf-8")
+        return valor
 
     def carregar_dados(self):
         self.table.setRowCount(0)
@@ -249,12 +304,9 @@ class UtilizadoresTab(QWidget):
         else:
             id_, nome, email, vinculo, ativo, data_fim = row
 
-        if isinstance(nome, (bytes, bytearray)):
-            nome = nome.decode("utf-8")
-        if isinstance(email, (bytes, bytearray)):
-            email = email.decode("utf-8")
-        if isinstance(vinculo, (bytes, bytearray)):
-            vinculo = vinculo.decode("utf-8")
+        nome = self._decode_if_bytes(nome)
+        email = self._decode_if_bytes(email)
+        vinculo = self._decode_if_bytes(vinculo)
 
         id_item = QTableWidgetItem("" if id_ is None else str(id_))
         nome_item = QTableWidgetItem(str(nome or ""))
@@ -265,10 +317,8 @@ class UtilizadoresTab(QWidget):
         status_texto = "Sim" if ativo_bool else "Não"
         status_item = QTableWidgetItem(status_texto)
         status_item.setData(Qt.ItemDataRole.UserRole, ativo_bool)
-
         if not self.icon_ativo.isNull() and not self.icon_inativo.isNull():
             status_item.setIcon(self.icon_ativo if ativo_bool else self.icon_inativo)
-
         status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         if data_fim:
@@ -329,11 +379,7 @@ class UtilizadoresTab(QWidget):
             dados["email"] = email_normalizado
 
             if not dados["nome"]:
-                QMessageBox.warning(
-                    self,
-                    "Dados incompletos",
-                    "Nome é obrigatório.",
-                )
+                QMessageBox.warning(self, "Dados incompletos", "Nome é obrigatório.")
                 return
 
             try:
@@ -367,16 +413,13 @@ class UtilizadoresTab(QWidget):
                     status="success",
                     details=f"Cadastrou utilizador ID {novo_id}",
                 )
+
                 self.carregar_dados()
                 self._atualizar_combo_movimentacoes()
 
             except Exception as e:
                 logger.error(f"Erro ao criar utilizador: {e}")
-                QMessageBox.critical(
-                    self,
-                    "Erro",
-                    f"Erro ao criar utilizador: {e}",
-                )
+                QMessageBox.critical(self, "Erro", f"Erro ao criar utilizador: {e}")
 
     def editar_utilizador(self):
         row_idx = self._get_linha_selecionada()
@@ -395,11 +438,7 @@ class UtilizadoresTab(QWidget):
             dados["email"] = email_normalizado
 
             if not dados["nome"]:
-                QMessageBox.warning(
-                    self,
-                    "Dados incompletos",
-                    "Nome é obrigatório.",
-                )
+                QMessageBox.warning(self, "Dados incompletos", "Nome é obrigatório.")
                 return
 
             try:
@@ -441,11 +480,7 @@ class UtilizadoresTab(QWidget):
 
             except Exception as e:
                 logger.error(f"Erro ao editar utilizador: {e}")
-                QMessageBox.critical(
-                    self,
-                    "Erro",
-                    f"Erro ao editar utilizador: {e}",
-                )
+                QMessageBox.critical(self, "Erro", f"Erro ao editar utilizador: {e}")
 
     def excluir_utilizador(self):
         if not is_admin():
@@ -502,6 +537,7 @@ class UtilizadoresTab(QWidget):
                 status="success",
                 details=f"Excluiu utilizador ID {dados['id']} ({dados['nome']})",
             )
+
             self.carregar_dados()
             self._atualizar_combo_movimentacoes()
 
@@ -540,6 +576,7 @@ class UtilizadoresTab(QWidget):
                 status="success",
                 details="Ativou utilizador" if novo_status else "Desativou utilizador",
             )
+
             self.carregar_dados()
             self._atualizar_combo_movimentacoes()
 
@@ -555,7 +592,7 @@ class UtilizadoresTab(QWidget):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Salvar utilizadores como CSV",
-            "",
+            "utilizadores.csv",
             "CSV Files (*.csv)",
         )
         if not path:

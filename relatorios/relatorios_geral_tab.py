@@ -183,8 +183,10 @@ class RelatoriosGeralTab(QWidget):
                     ])
 
             dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_status_message("Exportação CSV geral concluída.")
+            show_status = getattr(dash, "show_status_message", None)
+
+            if callable(show_status):
+                show_status("Exportação CSV geral concluída.")
             else:
                 QMessageBox.information(self, "Exportar CSV", "Exportação concluída.")
         except Exception as e:
@@ -235,8 +237,10 @@ class RelatoriosGeralTab(QWidget):
             pdf.build([table])
 
             dash = self._get_dash_main()
-            if dash is not None:
-                dash.show_status_message("Exportação PDF geral concluída.")
+            show_status = getattr(dash, "show_status_message", None)
+
+            if callable(show_status):
+                show_status("Exportação PDF geral concluída.")
             else:
                 QMessageBox.information(self, "Exportar PDF", "Exportação concluída.")
         except Exception as e:

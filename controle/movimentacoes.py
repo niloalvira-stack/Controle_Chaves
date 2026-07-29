@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialog, QFormLayout, QLineEdit, QComboBox, QHeaderView,
-    QMessageBox, QFileDialog, QDateEdit, QDialogButtonBox, QLabel, QToolButton
+    QMessageBox, QFileDialog, QDateEdit, QDialogButtonBox, QLabel, QToolButton,
+    QAbstractItemView
 )
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtCore import Qt, QDate, QTimer
@@ -23,8 +24,7 @@ import config
 
 from utils.email_service import enviar_email
 
-ALERTA_HORAS = 6
-
+ALERTA_HORAS = 12
 
 def _parse_datetime(value):
     if not value:
@@ -73,6 +73,24 @@ def _normalizar_status(status):
     return s
 
 
+def _normalizar_motivo_emprestimo(motivo):
+    if motivo is None:
+        return None
+    m = str(motivo).strip().lower()
+    if not m:
+        return None
+    permitidos = {
+        "normal",
+        "copia_temporaria",
+        "extravio",
+        "nao_devolvida",
+        "contingencia",
+    }
+    if m not in permitidos:
+        raise ValueError(f"Motivo de empréstimo inválido: {motivo}")
+    return m
+
+
 def pode_solicitar_retirada(utilizador_id: int):
     conn = get_db_connection()
     try:
@@ -97,7 +115,7 @@ def pode_solicitar_retirada(utilizador_id: int):
     if not ativo:
         return False, "Utilizador inativo. Contate o administrador."
 
-    if vinculo == "Servidor(a)" or data_fim is None:
+    if str(vinculo or "").strip() == "Servidor(a)" or data_fim is None:
         return True, ""
 
     hoje = date.today()
@@ -107,33 +125,375 @@ def pode_solicitar_retirada(utilizador_id: int):
     return True, ""
 
 
-def aplicar_cor_status_item(item, status, retirada_val, now):
-    status = _normalizar_status(status)
-    if not status:
-        return
-
-    try:
-        if status == "disponivel":
-            cor_hex = config.COLOR_STATUS_DISPONIVEL
-        elif status == "indisponivel":
-            cor_hex = (
-                config.COLOR_STATUS_ATRASO
-                if _esta_em_atraso(retirada_val, now)
-                else config.COLOR_STATUS_INDISPONIVEL
-            )
-        else:
-            return
-
-        item.setBackground(QBrush(QColor(cor_hex)))
-    except Exception:
-        pass
-
-
 def formatar_data_br(data_val):
     dt = _parse_datetime(data_val)
     if not dt:
         return "" if data_val is None else str(data_val)
     return dt.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def obter_chave_fisica_disponivel_por_sala(sala_id, apenas_principal=False):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        query = """
+            SELECT id, etiqueta, tipo, status
+            FROM chaves_fisicas
+            WHERE sala_id = %s
+              AND ativa = TRUE
+              AND status = 'disponivel'
+        """
+        params = [sala_id]
+
+        if apenas_principal:
+            query += " AND tipo = 'principal'"
+
+        query += """
+            ORDER BY
+                CASE tipo
+                    WHEN 'principal' THEN 0
+                    WHEN 'reserva' THEN 1
+                    ELSE 2
+                END,
+                id
+            LIMIT 1
+        """
+        cur.execute(query, params)
+        return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def pode_retirar_chave_fisica(chave_fisica_id):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, ativa, status
+            FROM chaves_fisicas
+            WHERE id = %s
+            """,
+            (chave_fisica_id,)
+        )
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return False, "Chave física não encontrada."
+
+    _, ativa, status = row
+    if not ativa:
+        return False, "Chave física inativa."
+    if _normalizar_status(status) != "disponivel":
+        return False, "Chave física não está disponível."
+    return True, ""
+
+
+def listar_movimentacoes(data_ini=None, data_fim=None):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT
+                m.id,
+                COALESCE(m.chave, cf.etiqueta, '') AS chave_display,
+                m.chave_fisica_id,
+                CASE
+                    WHEN COALESCE(s.nome, '') <> '' AND COALESCE(s.descricao, '') <> ''
+                        THEN s.nome || ' - ' || s.descricao
+                    WHEN COALESCE(s.nome, '') <> ''
+                        THEN s.nome
+                    ELSE COALESCE(s.descricao, '')
+                END AS sala_display,
+                COALESCE(u.nome, m.usuario) AS utilizador,
+                u.vinculo,
+                m.data_retirada,
+                m.data_retorno,
+                m.status,
+                cf.tipo,
+                m.motivo_emprestimo,
+                s.id AS sala_id,
+                m.alerta_enviado
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            LEFT JOIN salas s ON s.id = m.sala_id
+            LEFT JOIN chaves_fisicas cf ON cf.id = m.chave_fisica_id
+            WHERE 1=1
+        """
+        params = []
+
+        if data_ini is None and data_fim is None:
+            query += " AND m.data_retirada::date = CURRENT_DATE"
+        else:
+            if data_ini:
+                query += " AND m.data_retirada >= %s"
+                params.append(data_ini)
+            if data_fim:
+                query += " AND m.data_retirada <= %s"
+                params.append(data_fim)
+
+        query += """
+            ORDER BY
+                chave_display,
+                sala_display,
+                utilizador,
+                u.vinculo,
+                m.data_retirada DESC,
+                m.data_retorno,
+                m.status
+        """
+
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, data_fim=None, status=None):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT
+                m.id,
+                COALESCE(m.chave, cf.etiqueta, '') AS chave_display,
+                m.chave_fisica_id,
+                CASE
+                    WHEN COALESCE(s.nome, '') <> '' AND COALESCE(s.descricao, '') <> ''
+                        THEN s.nome || ' - ' || s.descricao
+                    WHEN COALESCE(s.nome, '') <> ''
+                        THEN s.nome
+                    ELSE COALESCE(s.descricao, '')
+                END AS sala_display,
+                COALESCE(u.nome, m.usuario) AS utilizador,
+                u.vinculo,
+                m.data_retirada,
+                m.data_retorno,
+                m.status,
+                cf.tipo,
+                m.motivo_emprestimo,
+                s.id AS sala_id,
+                m.alerta_enviado
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
+            LEFT JOIN salas s ON s.id = m.sala_id
+            LEFT JOIN chaves_fisicas cf ON cf.id = m.chave_fisica_id
+            WHERE 1=1
+        """
+        params = []
+
+        if chave:
+            query += " AND COALESCE(m.chave, cf.etiqueta, '') ILIKE %s"
+            params.append(f"%{chave.strip()}%")
+
+        if usuario:
+            query += " AND COALESCE(u.nome, m.usuario) ILIKE %s"
+            params.append(f"%{usuario.strip()}%")
+
+        if data_ini:
+            query += " AND m.data_retirada >= %s"
+            params.append(data_ini)
+
+        if data_fim:
+            query += " AND m.data_retirada <= %s"
+            params.append(data_fim)
+
+        if status and status.lower() not in ["todos", ""]:
+            query += " AND m.status = %s"
+            params.append(_normalizar_status(status))
+
+        query += """
+            ORDER BY
+                chave_display,
+                sala_display,
+                utilizador,
+                u.vinculo,
+                m.data_retirada DESC,
+                m.data_retorno,
+                m.status
+        """
+
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def salas_com_pelo_menos_uma_copia():
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT DISTINCT sala_id
+            FROM chaves_fisicas
+            WHERE ativa = TRUE
+              AND tipo = 'reserva'
+            """
+        )
+        return {row[0] for row in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+def registrar_retirada(sala_id, chave_fisica_id, utilizador_id, email, motivo_emprestimo=None):
+    email = (email or "").strip().lower()
+    motivo_emprestimo = _normalizar_motivo_emprestimo(motivo_emprestimo)
+    conn = get_db_connection()
+
+    try:
+        cursor = conn.cursor()
+        data_retirada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute(
+            "SELECT nome, ativo FROM utilizadores WHERE id = %s",
+            (utilizador_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Utilizador id={utilizador_id} não encontrado")
+
+        nome_utilizador, ativo = row
+        if not ativo:
+            raise ValueError(f"Utilizador id={utilizador_id} está desativado")
+        if not nome_utilizador:
+            raise ValueError(f"Utilizador id={utilizador_id} sem nome válido")
+
+        cursor.execute(
+            """
+            SELECT id, sala_id, etiqueta, ativa, status
+            FROM chaves_fisicas
+            WHERE id = %s
+            FOR UPDATE
+            """,
+            (chave_fisica_id,)
+        )
+        chave_row = cursor.fetchone()
+        if not chave_row:
+            raise ValueError(f"Chave física id={chave_fisica_id} não encontrada")
+
+        _, sala_id_chave, etiqueta, ativa, status_chave = chave_row
+        if sala_id_chave != sala_id:
+            raise ValueError("A chave física selecionada não pertence à sala informada")
+        if not ativa:
+            raise ValueError("Chave física inativa")
+        if _normalizar_status(status_chave) != "disponivel":
+            raise ValueError("Chave física não está disponível")
+
+        cursor.execute(
+            """
+            SELECT id FROM movimentacoes
+            WHERE chave_fisica_id = %s
+              AND status = 'indisponivel'
+              AND data_retorno IS NULL
+            LIMIT 1
+            """,
+            (chave_fisica_id,)
+        )
+        if cursor.fetchone():
+            raise ValueError("Já existe uma retirada em aberto para esta chave física")
+
+        status = "indisponivel"
+        chave_display = etiqueta or montar_display_sala_por_id(sala_id)
+
+        cursor.execute(
+            """
+            INSERT INTO movimentacoes (
+                chave, chave_fisica_id, sala_id, utilizador_id, usuario, email,
+                data_retirada, status, alerta_enviado, alerta_enviado_em,
+                alerta_erro, motivo_emprestimo
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, NULL, NULL, %s)
+            """,
+            (
+                chave_display,
+                chave_fisica_id,
+                sala_id,
+                utilizador_id,
+                nome_utilizador,
+                email,
+                data_retirada,
+                status,
+                motivo_emprestimo
+            )
+        )
+
+        cursor.execute(
+            "UPDATE salas SET status = 'indisponivel' WHERE id = %s",
+            (sala_id,)
+        )
+
+        cursor.execute(
+            "UPDATE chaves_fisicas SET status = 'indisponivel', atualizada_em = CURRENT_TIMESTAMP WHERE id = %s",
+            (chave_fisica_id,)
+        )
+
+        conn.commit()
+        return chave_display
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def registrar_devolucao(mov_id, sala_id=None):
+    conn = get_db_connection()
+
+    try:
+        cursor = conn.cursor()
+        data_retorno = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = "disponivel"
+
+        cursor.execute(
+            """
+            SELECT chave, chave_fisica_id, sala_id, status
+            FROM movimentacoes
+            WHERE id = %s
+            FOR UPDATE
+            """,
+            (mov_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Movimentação id={mov_id} não encontrada")
+
+        chave, chave_fisica_id, sala_id_db, status_atual = row
+        if _normalizar_status(status_atual) == "disponivel":
+            return chave or "", chave_fisica_id, sala_id_db
+
+        sala_id_final = sala_id_db if sala_id is None else sala_id
+
+        cursor.execute(
+            """
+            UPDATE movimentacoes
+            SET data_retorno = %s, status = %s, alerta_enviado = FALSE
+            WHERE id = %s
+            """,
+            (data_retorno, status, mov_id)
+        )
+
+        if sala_id_final is not None:
+            cursor.execute(
+                "UPDATE salas SET status = 'disponivel' WHERE id = %s",
+                (sala_id_final,)
+            )
+
+        if chave_fisica_id is not None:
+            cursor.execute(
+                "UPDATE chaves_fisicas SET status = 'disponivel', atualizada_em = CURRENT_TIMESTAMP WHERE id = %s",
+                (chave_fisica_id,)
+            )
+
+        conn.commit()
+        return chave or "", chave_fisica_id, sala_id_final
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 class FiltroMovimentacaoDialog(QDialog):
@@ -186,186 +546,17 @@ class FiltroMovimentacaoDialog(QDialog):
         }
 
 
-def listar_movimentacoes(data_ini=None, data_fim=None):
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        query = """
-            SELECT
-                   m.id,
-                   m.chave,
-                   s.descricao,
-                   COALESCE(u.nome, m.usuario) AS utilizador,
-                   u.vinculo,
-                   m.data_retirada,
-                   m.data_retorno,
-                   m.status
-            FROM movimentacoes m
-            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-            LEFT JOIN salas s        ON s.id = m.sala_id
-            WHERE 1=1
-        """
-        params = []
-
-        if data_ini is None and data_fim is None:
-            query += " AND m.data_retirada::date = CURRENT_DATE"
-        else:
-            if data_ini:
-                query += " AND m.data_retirada >= %s"
-                params.append(data_ini)
-            if data_fim:
-                query += " AND m.data_retirada <= %s"
-                params.append(data_fim)
-
-        query += """
-            ORDER BY
-                m.chave,
-                s.descricao,
-                utilizador,
-                u.vinculo,
-                m.data_retirada DESC,
-                m.data_retorno,
-                m.status
-        """
-
-        cursor.execute(query, params)
-        return cursor.fetchall()
-    finally:
-        conn.close()
-
-
-def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, data_fim=None, status=None):
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        query = """
-            SELECT
-                   m.id,
-                   m.chave,
-                   s.descricao,
-                   COALESCE(u.nome, m.usuario) AS utilizador,
-                   u.vinculo,
-                   m.data_retirada,
-                   m.data_retorno,
-                   m.status
-            FROM movimentacoes m
-            LEFT JOIN utilizadores u ON u.id = m.utilizador_id
-            LEFT JOIN salas s        ON s.id = m.sala_id
-            WHERE 1=1
-        """
-        params = []
-
-        if chave:
-            query += " AND m.chave ILIKE %s"
-            params.append(f"%{chave}%")
-        if usuario:
-            query += " AND LOWER(COALESCE(u.nome, m.usuario)) LIKE %s"
-            params.append(f"%{usuario.strip().lower()}%")
-        if data_ini:
-            query += " AND m.data_retirada >= %s"
-            params.append(data_ini)
-        if data_fim:
-            query += " AND m.data_retirada <= %s"
-            params.append(data_fim)
-        if status and status.lower() not in ["todos", ""]:
-            query += " AND m.status = %s"
-            params.append(_normalizar_status(status))
-
-        query += """
-            ORDER BY
-                m.chave,
-                s.descricao,
-                utilizador,
-                u.vinculo,
-                m.data_retirada DESC,
-                m.data_retorno,
-                m.status
-        """
-        cursor.execute(query, params)
-        return cursor.fetchall()
-    finally:
-        conn.close()
-
-
-def registrar_retirada(sala_id, chave_display, utilizador_id, email):
-    email = (email or "").strip().lower()
-    conn = get_db_connection()
-
-    try:
-        cursor = conn.cursor()
-        data_retirada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        cursor.execute(
-            "SELECT nome, ativo FROM utilizadores WHERE id = %s",
-            (utilizador_id,)
-        )
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError(f"Utilizador id={utilizador_id} não encontrado")
-
-        nome_utilizador, ativo = row
-        if not ativo:
-            raise ValueError(f"Utilizador id={utilizador_id} está desativado")
-        if not nome_utilizador:
-            raise ValueError(f"Utilizador id={utilizador_id} sem nome válido")
-
-        status = "indisponivel"
-
-        cursor.execute(
-            """
-            INSERT INTO movimentacoes (
-                chave, sala_id, utilizador_id, usuario, email, data_retirada, status,
-                alerta_enviado, alerta_enviado_em, alerta_erro
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, NULL, NULL)
-            """,
-            (chave_display, sala_id, utilizador_id, nome_utilizador, email, data_retirada, status)
-        )
-
-        cursor.execute(
-            "UPDATE salas SET status = 'indisponivel' WHERE id = %s",
-            (sala_id,)
-        )
-
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def registrar_devolucao(mov_id, chave, sala_id):
-    conn = get_db_connection()
-
-    try:
-        cursor = conn.cursor()
-        data_retorno = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        status = "disponivel"
-
-        cursor.execute(
-            "UPDATE movimentacoes SET data_retorno = %s, status = %s WHERE id = %s AND chave = %s",
-            (data_retorno, status, mov_id, chave)
-        )
-
-        cursor.execute(
-            "UPDATE salas SET status = 'disponivel' WHERE id = %s",
-            (sala_id,)
-        )
-
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
 class MovimentacoesTab(QWidget):
     def __init__(self):
         super().__init__()
         self.sala_id_atual = None
         self.filtro_atual = None
+        self.chave_fisica_id_atual = None
+        self._em_operacao = False
+        self.filtro_apenas_copias = False
+
+        self.utilizador_atual = get_current_user()
+        self.eh_admin = bool(self.utilizador_atual and self.utilizador_atual.get("is_admin", False))
 
         self.init_ui()
 
@@ -400,6 +591,23 @@ class MovimentacoesTab(QWidget):
                 dash.show_operation_done(mensagem)
             except Exception:
                 pass
+
+    def _preservar_mov_id_selecionado(self):
+        selecionadas = self.table.selectionModel().selectedRows()
+        if not selecionadas:
+            return None
+        linha = selecionadas[0].row()
+        item = self.table.item(linha, 0)
+        return item.text().strip() if item else None
+
+    def _restaurar_selecao_por_mov_id(self, mov_id):
+        if not mov_id:
+            return
+        for linha in range(self.table.rowCount()):
+            item = self.table.item(linha, 0)
+            if item and item.text().strip() == str(mov_id):
+                self.table.selectRow(linha)
+                break
 
     def acao_verificar_pendencias(self):
         qtd = verificar_pendencias_e_enviar_emails()
@@ -445,6 +653,15 @@ class MovimentacoesTab(QWidget):
         form_layout.addWidget(self.combo_utilizador)
         form_layout.addWidget(self.btn_novo_utilizador)
 
+        self.combo_motivo = QComboBox()
+        self.combo_motivo.addItem("Normal", "normal")
+        self.combo_motivo.addItem("Cópia temporária", "copia_temporaria")
+        self.combo_motivo.addItem("Extravio", "extravio")
+        self.combo_motivo.addItem("Não devolvida", "nao_devolvida")
+        self.combo_motivo.addItem("Contingência", "contingencia")
+        form_layout.addWidget(QLabel("Motivo:"))
+        form_layout.addWidget(self.combo_motivo)
+
         self.btn_retirar = QPushButton("Registrar Retirada")
         self.btn_retirar.setObjectName("btnRetirar")
         self.btn_retirar.clicked.connect(self.adicionar_movimentacao)
@@ -482,17 +699,21 @@ class MovimentacoesTab(QWidget):
         export_layout.addStretch()
         layout.addLayout(export_layout)
 
+        colunas = [
+            "ID", "Chave", "Chave física ID", "Descrição sala", "Utilizador", "Vínculo",
+            "Retirada", "Devolução", "Status", "Tipo", "Motivo", "Aviso"
+        ]
+        if not self.eh_admin:
+            colunas.pop(9)
+
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Chave", "Descrição sala", "Utilizador", "Vínculo",
-            "Retirada", "Devolução", "Status"
-        ])
+        self.table.setColumnCount(len(colunas))
+        self.table.setHorizontalHeaderLabels(colunas)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setColumnHidden(0, True)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         layout.addWidget(self.table)
 
@@ -558,8 +779,25 @@ class MovimentacoesTab(QWidget):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
+        if dlg.sala_id_selecionada is None:
+            QMessageBox.warning(self, "Aviso", "Nenhuma sala válida foi selecionada.")
+            return
+
         self.sala_id_atual = dlg.sala_id_selecionada
         self.label_sala_selecionada.setText(dlg.sala_display_selecionada or "")
+
+        if is_admin and dlg.apenas_copias_reserva:
+            self.filtro_apenas_copias = True
+            busca_apenas_principal = False
+        else:
+            self.filtro_apenas_copias = False
+            busca_apenas_principal = True
+
+        chave_row = obter_chave_fisica_disponivel_por_sala(
+            self.sala_id_atual,
+            apenas_principal=busca_apenas_principal
+        )
+        self.chave_fisica_id_atual = chave_row[0] if chave_row else None
 
     def load_utilizadores_combo(self):
         self.combo_utilizador.clear()
@@ -606,12 +844,15 @@ class MovimentacoesTab(QWidget):
             try:
                 cur = conn.cursor()
                 cur.execute(
-                    "INSERT INTO utilizadores (nome, email, ativo) VALUES (%s, %s, TRUE)",
+                    """
+                    INSERT INTO utilizadores (nome, email, ativo)
+                    VALUES (%s, %s, TRUE)
+                    RETURNING id
+                    """,
                     (nome, email)
                 )
-                conn.commit()
-                cur.execute("SELECT currval(pg_get_serial_sequence('utilizadores','id'))")
                 novo_id = cur.fetchone()[0]
+                conn.commit()
             except Exception as e:
                 conn.rollback()
                 QMessageBox.critical(self, "Erro", f"Não foi possível cadastrar: {e}")
@@ -639,45 +880,90 @@ class MovimentacoesTab(QWidget):
         dialog = FiltroMovimentacaoDialog(self)
         if dialog.exec():
             self.filtro_atual = dialog.get_filters()
-            resultados = buscar_movimentacoes_personalizado(**self.filtro_atual)
-            self.exibir_historico(resultados)
+            self.carregar_movimentacoes()
 
     def carregar_movimentacoes(self):
-        if self.filtro_atual is None:
-            dados = listar_movimentacoes()
-        else:
-            dados = buscar_movimentacoes_personalizado(**self.filtro_atual)
-        self.exibir_historico(dados)
+        if self._em_operacao:
+            return
+        try:
+            mov_id_sel = self._preservar_mov_id_selecionado() if hasattr(self, "table") else None
+
+            if self.filtro_atual is None:
+                dados = listar_movimentacoes()
+            else:
+                dados = buscar_movimentacoes_personalizado(**self.filtro_atual)
+
+            if self.eh_admin and self.filtro_apenas_copias:
+                salas_com_copia = salas_com_pelo_menos_uma_copia()
+                dados = [linha for linha in dados if linha[12] in salas_com_copia]
+
+            self.exibir_historico(dados)
+            self._restaurar_selecao_por_mov_id(mov_id_sel)
+        except Exception as e:
+            user = get_current_user()
+            user_login = user["login"] if user else "sistema"
+            log_acao(
+                action="carregar_movimentacoes",
+                user=user_login,
+                resource="movimentacoes_tab",
+                status="error",
+                details=f"Erro ao atualizar lista: {e}"
+            )
 
     def exibir_historico(self, historico):
         self.table.setRowCount(0)
         now = datetime.now()
 
         for linha_idx, dados in enumerate(historico):
+            dados = list(dados)
+            alerta_enviado = dados.pop()
+
+            if not self.eh_admin:
+                dados.pop(9)
+
             self.table.insertRow(linha_idx)
             for col_idx, valor in enumerate(dados):
                 if isinstance(valor, (bytes, bytearray)):
                     valor = valor.decode("utf-8", errors="ignore")
 
-                if col_idx in (5, 6):
+                if col_idx in (6, 7):
                     valor = formatar_data_br(valor)
 
                 texto = str(valor) if valor is not None else ""
                 item = QTableWidgetItem(texto)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
-                if col_idx == 7:
-                    status = _normalizar_status(dados[7])
-                    retirada = dados[5]
-                    aplicar_cor_status_item_generico(item, status, retirada, dados[6], now)
+                coluna_status = 8
+                if col_idx == coluna_status:
+                    status = _normalizar_status(dados[coluna_status])
+                    retirada = dados[6]
+                    devolucao = dados[7]
+
+                    aplicar_cor_status_item_generico(item, status, retirada, devolucao, now)
+
+                    if status == "indisponivel" and _esta_em_atraso(retirada, now):
+                        item.setBackground(QBrush(QColor("#ffcccc")))
+                        item.setForeground(QBrush(QColor("#b71c1c")))
 
                 self.table.setItem(linha_idx, col_idx, item)
+
+            coluna_aviso = self.table.columnCount() - 1
+            item_aviso = QTableWidgetItem()
+            if alerta_enviado:
+                item_aviso.setText("✅")
+                item_aviso.setToolTip("Aviso de atraso já enviado por e-mail")
+            else:
+                item_aviso.setText("❌")
+                item_aviso.setToolTip("Aviso ainda não enviado")
+            item_aviso.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(linha_idx, coluna_aviso, item_aviso)
 
     def adicionar_movimentacao(self):
         sala_id = self.sala_id_atual
         dados_user = self.combo_utilizador.currentData() or {}
         utilizador_id = dados_user.get("id")
         email = (dados_user.get("email", "") or "").strip().lower()
+        motivo_emprestimo = self.combo_motivo.currentData()
         operador = get_current_user()
         operador_login = operador["login"] if operador else "desconhecido"
 
@@ -697,34 +983,38 @@ class MovimentacoesTab(QWidget):
             QMessageBox.warning(self, "Erro", "E-mail do utilizador é inválido.")
             return
 
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """SELECT id FROM movimentacoes
-                   WHERE sala_id = %s AND status = 'indisponivel' AND data_retorno IS NULL
-                   LIMIT 1""",
-                (sala_id,)
+        chave_row = obter_chave_fisica_disponivel_por_sala(
+            sala_id,
+            apenas_principal = not self.filtro_apenas_copias
+        )
+        if not chave_row:
+            tipo_chave = "cópia/reserva" if self.filtro_apenas_copias else "principal"
+            QMessageBox.warning(
+                self,
+                "Sem chave disponível",
+                f"Nenhuma chave {tipo_chave} disponível para esta sala."
             )
-            if cur.fetchone():
-                QMessageBox.warning(
-                    self, "Chave já retirada",
-                    "Já existe uma retirada em aberto para esta sala. Devolva antes de registrar nova."
-                )
-                return
-        finally:
-            conn.close()
+            return
 
-        chave = montar_display_sala_por_id(sala_id)
+        chave_fisica_id = chave_row[0]
+        ok, mensagem = pode_retirar_chave_fisica(chave_fisica_id)
+        if not ok:
+            QMessageBox.warning(self, "Atenção", mensagem)
+            return
+
+        self._em_operacao = True
+        self.timer.stop()
         try:
-            registrar_retirada(sala_id, chave, utilizador_id, email)
+            chave = registrar_retirada(sala_id, chave_fisica_id, utilizador_id, email, motivo_emprestimo)
             log_acao(
                 action="retirada", user=operador_login, resource=chave, status="success",
-                details=f"utilizador={utilizador_id}, sala={sala_id}"
+                details=f"utilizador={utilizador_id}, sala={sala_id}, chave_fisica_id={chave_fisica_id}, motivo={motivo_emprestimo}"
             )
             self.sala_id_atual = None
+            self.chave_fisica_id_atual = None
             self.label_sala_selecionada.clear()
             self.combo_utilizador.setCurrentIndex(0)
+            self.combo_motivo.setCurrentIndex(0)
             self.carregar_movimentacoes()
             self._notificar_operacao(f"Retirada registrada: {chave}")
         except Exception as e:
@@ -733,20 +1023,23 @@ class MovimentacoesTab(QWidget):
                 status="error", details=f"erro: {e}"
             )
             QMessageBox.critical(self, "Erro", f"Falha ao registrar retirada:\n{e}")
+        finally:
+            self._em_operacao = False
+            self.timer.start(5000)
 
     def devolver_selecionada(self):
-        itens_selecionados = self.table.selectedItems()
+        selecionadas = self.table.selectionModel().selectedRows()
         operador = get_current_user()
         operador_login = operador["login"] if operador else "desconhecido"
 
-        if not itens_selecionados:
+        if not selecionadas:
             QMessageBox.warning(self, "Atenção", "Selecione uma linha para registrar devolução.")
             return
 
-        linha = itens_selecionados[0].row()
+        linha = selecionadas[0].row()
         mov_id = self.table.item(linha, 0).text().strip()
         chave = self.table.item(linha, 1).text().strip()
-        status = _normalizar_status(self.table.item(linha, 7).text())
+        status = _normalizar_status(self.table.item(linha, 8).text())
 
         if not mov_id.isdigit():
             QMessageBox.warning(self, "Erro", "Registro inválido.")
@@ -755,23 +1048,13 @@ class MovimentacoesTab(QWidget):
             QMessageBox.information(self, "Info", "Esta chave já está devolvida.")
             return
 
-        conn = get_db_connection()
+        self._em_operacao = True
+        self.timer.stop()
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT sala_id FROM movimentacoes WHERE id = %s", (int(mov_id),))
-            sala_id = cur.fetchone()
-            if not sala_id:
-                QMessageBox.critical(self, "Erro", "Registro não encontrado no banco.")
-                return
-            sala_id = sala_id[0]
-        finally:
-            conn.close()
-
-        try:
-            registrar_devolucao(int(mov_id), chave, sala_id)
+            chave, chave_fisica_id, sala_id = registrar_devolucao(int(mov_id))
             log_acao(
                 action="devolucao", user=operador_login, resource=chave, status="success",
-                details=f"mov_id={mov_id}, sala={sala_id}"
+                details=f"mov_id={mov_id}, sala={sala_id}, chave_fisica_id={chave_fisica_id}"
             )
             self.carregar_movimentacoes()
             self._notificar_operacao(f"Devolução registrada: {chave}")
@@ -781,6 +1064,9 @@ class MovimentacoesTab(QWidget):
                 status="error", details=f"erro: {e}"
             )
             QMessageBox.critical(self, "Erro", f"Falha ao registrar devolução:\n{e}")
+        finally:
+            self._em_operacao = False
+            self.timer.start(5000)
 
     def obter_dados_da_tabela(self):
         dados = []
@@ -800,7 +1086,7 @@ class MovimentacoesTab(QWidget):
             return
 
         dados = self.obter_dados_da_tabela()
-        cabecalho = ["ID", "Chave", "Descrição sala", "Utilizador", "Vínculo", "Retirada", "Devolução", "Status"]
+        cabecalho = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
 
         try:
             with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
@@ -819,20 +1105,28 @@ class MovimentacoesTab(QWidget):
             return
 
         dados = self.obter_dados_da_tabela()
-        cabecalho = ["ID", "Chave", "Descrição sala", "Utilizador", "Vínculo", "Retirada", "Devolução", "Status"]
-        linhas = [cabecalho] + dados
+        cabecalho = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
 
         estilos = getSampleStyleSheet()
         estilo_celula = estilos["BodyText"]
         estilo_celula.fontName = "Helvetica"
         estilo_celula.fontSize = 8
+        estilo_celula.leading = 10
 
         try:
+            linhas = [cabecalho]
+            for linha in dados:
+                linhas.append([
+                    Paragraph(str(c).replace("&", "&amp;") if c is not None else "", estilo_celula)
+                    for c in linha
+                ])
+
             doc = SimpleDocTemplate(
                 caminho, pagesize=landscape(A4),
                 leftMargin=20, rightMargin=20, topMargin=20, bottomMargin=20
             )
-            tabela = Table(linhas, repeatRows=1, colWidths=[30, 90, 140, 110, 70, 90, 90, 70])
+            larguras = [28, 80, 55, 130, 100, 70, 85, 85, 70, 55, 85, 50] if self.eh_admin else [28, 80, 55, 130, 100, 70, 85, 85, 70, 85, 50]
+            tabela = Table(linhas, repeatRows=1, colWidths=larguras)
             tabela.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4285F4")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -842,7 +1136,10 @@ class MovimentacoesTab(QWidget):
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
-                ("PADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]))
 
             elementos = [
@@ -858,19 +1155,19 @@ class MovimentacoesTab(QWidget):
 
 def verificar_pendencias_e_enviar_emails():
     conn = get_db_connection()
+    total_pendencias = 0
     try:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT id, chave, usuario, email, data_retirada, alerta_enviado
-            FROM movimentacoes
-            WHERE status = 'indisponivel' AND data_retorno IS NULL
+            SELECT m.id, m.chave, m.usuario, u.email, m.data_retirada, m.alerta_enviado
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON m.utilizador_id = u.id
+            WHERE m.status = 'indisponivel' AND m.data_retorno IS NULL
             """
         )
         linhas = cursor.fetchall()
-
         agora = datetime.now()
-        total_pendencias = 0
 
         for mov_id, chave, usuario, email, data_retirada, alerta_enviado in linhas:
             if not data_retirada:
@@ -878,10 +1175,7 @@ def verificar_pendencias_e_enviar_emails():
 
             retirada_dt = _parse_datetime(data_retirada)
             if not retirada_dt:
-                log_acao(
-                    action="verificar_pendencias", user="sistema", resource=chave,
-                    status="error", details=f"Data inválida no registro {mov_id}"
-                )
+                log_acao("verificar_pendencias", "sistema", chave, "error", f"Data inválida mov={mov_id}")
                 continue
 
             horas_atraso = (agora - retirada_dt).total_seconds() / 3600
@@ -892,30 +1186,39 @@ def verificar_pendencias_e_enviar_emails():
             if alerta_enviado:
                 continue
 
+            log_acao(
+                "verificar_pendencias", "sistema", chave, "info",
+                f"Encontrado: usuario={usuario} | email_encontrado='{email}' | horas={horas_atraso:.1f}"
+            )
+
             if not email:
-                cursor.execute(
-                    "UPDATE movimentacoes SET alerta_erro = %s WHERE id = %s",
-                    ("Sem e-mail cadastrado", mov_id)
-                )
+                msg_erro = "E-mail não cadastrado no perfil do utilizador"
+                cursor.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id = %s", (msg_erro, mov_id))
                 conn.commit()
+                log_acao("verificar_pendencias", "sistema", chave, "warning", msg_erro)
                 continue
 
             if not email_valido(email):
-                cursor.execute(
-                    "UPDATE movimentacoes SET alerta_erro = %s WHERE id = %s",
-                    (f"E-mail inválido: {email}", mov_id)
-                )
+                msg_erro = f"E-mail inválido no cadastro: {email}"
+                cursor.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id = %s", (msg_erro, mov_id))
                 conn.commit()
+                log_acao("verificar_pendencias", "sistema", chave, "error", msg_erro)
                 continue
 
-            assunto = f"Aviso: Devolução pendente - {chave}"
-            corpo = (
-                f"Olá, {usuario}!\n\n"
-                f"Consta em nosso sistema que a chave/sala '{chave}' foi retirada em "
-                f"{formatar_data_br(data_retirada)} e ainda não foi devolvida.\n\n"
-                f"Já se passaram {horas_atraso:.1f} horas. Por favor, regularize a devolução o quanto antes.\n\n"
-                f"Atenciosamente,\nSistema de Controle de Chaves"
-            )
+            assunto = f"⚠️ AVISO: Devolução Pendente – Chave/Sala {chave}"
+            corpo = f"""
+Prezado(a) {usuario},
+
+Consta no Sistema de Controle de Chaves do IFRS – Campus Alvorada que a chave/sala **{chave}** foi retirada em **{formatar_data_br(data_retirada)}** e ainda não foi devolvida.
+
+Até o momento, já se passaram **{horas_atraso:.1f} horas** sem a devolução.
+
+Solicitamos a gentileza de regularizar a situação o mais breve possível, para mantermos o controle e a segurança das instalações.
+
+Atenciosamente,
+IFRS – Campus Alvorada
+Sistema de Controle de Chaves
+"""
 
             try:
                 enviar_email(email, assunto, corpo)
@@ -927,38 +1230,50 @@ def verificar_pendencias_e_enviar_emails():
                 )
                 conn.commit()
                 log_acao(
-                    action="verificar_pendencias", user="sistema", resource=chave,
-                    status="success", details=f"Alerta enviado para {email}"
+                    "verificar_pendencias", "sistema", chave, "success",
+                    f"E-mail de aviso enviado para {email} | atraso: {horas_atraso:.1f}h"
                 )
-            except Exception as e:
+            except Exception as erro_envio:
                 conn.rollback()
+                msg_erro = f"Falha ao enviar e-mail: {str(erro_envio)}"
                 cursor.execute(
                     "UPDATE movimentacoes SET alerta_erro = %s WHERE id = %s",
-                    (str(e), mov_id)
+                    (msg_erro, mov_id)
                 )
                 conn.commit()
-                log_acao(
-                    action="verificar_pendencias", user="sistema", resource=chave,
-                    status="error", details=f"Erro ao enviar e-mail: {e}"
-                )
+                log_acao("verificar_pendencias", "sistema", chave, "error", msg_erro)
+                continue
 
+        conn.commit()
         return total_pendencias
+
+    except Exception as erro_global:
+        conn.rollback()
+        log_acao(
+            "verificar_pendencias", "sistema", "geral", "error",
+            f"Erro geral na verificação: {str(erro_global)}"
+        )
+        return 0
     finally:
         conn.close()
-
 
 def ha_chaves_em_atraso():
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """SELECT data_retirada FROM movimentacoes
-               WHERE status = 'indisponivel' AND data_retorno IS NULL"""
-        )
-        linhas = cursor.fetchall()
-    finally:
-        conn.close()
-
-    agora = datetime.now()
-    qtd = sum(1 for (dt,) in linhas if _esta_em_atraso(dt, agora))
-    return qtd > 0, qtd
+        """Verifica se existe alguma chave com devolução em atraso"""
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT data_retirada
+                FROM movimentacoes
+                WHERE status = 'indisponivel'
+                  AND data_retorno IS NULL
+                """
+            )
+            agora = datetime.now()
+            for (data_retirada,) in cursor.fetchall():
+                if _esta_em_atraso(data_retirada, agora):
+                    return True
+            return False
+        finally:
+            conn.close()

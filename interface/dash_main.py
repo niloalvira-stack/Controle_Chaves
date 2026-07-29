@@ -7,11 +7,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap
-
 from admin.utilizadores_tab import UtilizadoresTab
 from admin.admin import AdminTab
 from admin.log_viewer_tab import LogViewerTab
-from controle.movimentacoes import MovimentacoesTab, ha_chaves_em_atraso
+from controle.movimentacoes import MovimentacoesTab, ha_chaves_em_atraso, verificar_pendencias_e_enviar_emails
 from relatorios.relatorios_tab import RelatoriosTab
 from autenticacao import session_manager
 from utils.utils_log import get_logger
@@ -66,25 +65,26 @@ class DashMain(QMainWindow):
         self.label_hora = QLabel()
         self.label_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_hora.setStyleSheet(
-            "QLabel { background-color: black; color: #00ff00; "
-            "font-size: 22px; font-weight: bold; padding: 4px 10px; }"
-        )
+        "QLabel { background-color: #f8f9fa; color: #212529; "
+        "font-size: 24px; font-Bold Sweight: 500; padding: 10px 14px; "
+        "border: 1px solid #dee2e6; border-radius: 4px; }"
+         )
         topo_layout.addWidget(self.label_hora)
 
         topo_spacer = QSpacerItem(
-            40, 20,
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Minimum
-        )
+        40, 20,
+        QSizePolicy.Policy.Expanding,
+        QSizePolicy.Policy.Minimum
+    )
         topo_layout.addItem(topo_spacer)
         layout_principal.addLayout(topo_layout)
 
         self.logo_label = QLabel()
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.logo_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed
-        )
+        QSizePolicy.Policy.Expanding,
+        QSizePolicy.Policy.Fixed
+)
 
         pix = QPixmap(config.APP_LOGO_PATH)
         if not pix.isNull():
@@ -182,7 +182,14 @@ class DashMain(QMainWindow):
 
     def verificar_chaves_atraso(self):
         try:
-            tem_atraso, qtd = ha_chaves_em_atraso()
+            resultado = ha_chaves_em_atraso()
+
+            # Aceita tanto 1 valor quanto 2 valores de retorno
+            if isinstance(resultado, (list, tuple)) and len(resultado) == 2:
+                tem_atraso, qtd = resultado
+            else:
+                tem_atraso = bool(resultado)
+                qtd = verificar_pendencias_e_enviar_emails() if tem_atraso else 0
 
             if tem_atraso:
                 self.lblAlertaChaves.setText(f"Há {qtd} chave(s) em atraso!")
@@ -322,8 +329,6 @@ class DashMain(QMainWindow):
         )
 
         if resp == QMessageBox.StandardButton.Yes:
-            self._executar_logout()
-
             if self.on_logout:
                 self.on_logout()
             else:
@@ -339,8 +344,6 @@ class DashMain(QMainWindow):
 
             if hasattr(self, "timer_chaves_atraso") and self.timer_chaves_atraso.isActive():
                 self.timer_chaves_atraso.stop()
-
-            self._executar_logout()
         except Exception:
             logger.exception("Erro durante o fechamento da janela")
         finally:

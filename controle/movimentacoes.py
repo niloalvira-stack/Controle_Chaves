@@ -146,18 +146,20 @@ def obter_chave_fisica_disponivel_por_sala(sala_id, apenas_principal=False):
         params = [sala_id]
 
         if apenas_principal:
-            query += " AND tipo = 'principal'"
+            query += " AND tipo = 'principal' LIMIT 1"
+        else:
+            # Busca PRIMEIRO a principal, DEPOIS a reserva/cópia, pega a primeira disponível
+            query += """
+                ORDER BY
+                    CASE tipo
+                        WHEN 'principal' THEN 0
+                        WHEN 'reserva' THEN 1
+                        ELSE 2
+                    END,
+                    id
+                LIMIT 1
+            """
 
-        query += """
-            ORDER BY
-                CASE tipo
-                    WHEN 'principal' THEN 0
-                    WHEN 'reserva' THEN 1
-                    ELSE 2
-                END,
-                id
-            LIMIT 1
-        """
         cur.execute(query, params)
         return cur.fetchone()
     finally:
@@ -788,10 +790,10 @@ class MovimentacoesTab(QWidget):
 
         if is_admin and dlg.apenas_copias_reserva:
             self.filtro_apenas_copias = True
-            busca_apenas_principal = False
+            busca_apenas_principal = True  # Se quiser pegar só cópias quando o botão estiver marcado
         else:
             self.filtro_apenas_copias = False
-            busca_apenas_principal = True
+            busca_apenas_principal = False  # Agora busca QUALQUER chave disponível
 
         chave_row = obter_chave_fisica_disponivel_por_sala(
             self.sala_id_atual,

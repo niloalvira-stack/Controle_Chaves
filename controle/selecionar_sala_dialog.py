@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from autenticacao.helpers_autenticacao import get_db_connection
 from utils.utils import montar_display_sala_por_id
-# ✅ Importa a função de estilo do sistema
 from utils.button_style import aplicar_estilo_botao_padrao
 
 
@@ -34,7 +33,7 @@ class SelecionarSalaDialog(QDialog):
         self.filtro_input.setMinimumHeight(32)
 
         self.btn_filtrar = QPushButton("Filtrar")
-        self.btn_filtrar.setMinimumWidth(90)  # ✅ Largura definida diretamente no botão
+        self.btn_filtrar.setMinimumWidth(90)
         aplicar_estilo_botao_padrao(self.btn_filtrar, cor_fundo="#e9ecef", cor_texto="#212529")
         self.btn_filtrar.clicked.connect(self.aplicar_filtro)
         barra_layout.addWidget(self.filtro_input)
@@ -61,26 +60,23 @@ class SelecionarSalaDialog(QDialog):
         botoes_layout.setSpacing(12)
         botoes_layout.addStretch()
 
-        # Botão de filtro
         self.btn_apenas_copias = QPushButton("Apenas Cópias/Reserva")
         self.btn_apenas_copias.setCheckable(True)
-        self.btn_apenas_copias.setMinimumWidth(150)  # ✅ Largura aqui
+        self.btn_apenas_copias.setMinimumWidth(150)
         aplicar_estilo_botao_padrao(self.btn_apenas_copias, cor_fundo="#e9ecef", cor_texto="#212529")
         self.btn_apenas_copias.clicked.connect(self.alternar_filtro_copias)
         if not self.is_admin:
             self.btn_apenas_copias.setVisible(False)
         botoes_layout.addWidget(self.btn_apenas_copias)
 
-        # Botão OK
         self.btn_ok = QPushButton("OK")
-        self.btn_ok.setMinimumWidth(90)  # ✅ Largura aqui
+        self.btn_ok.setMinimumWidth(90)
         aplicar_estilo_botao_padrao(self.btn_ok, cor_fundo="#007bff", cor_texto="white")
         self.btn_ok.clicked.connect(self.validar_e_aceitar)
         botoes_layout.addWidget(self.btn_ok)
 
-        # Botão Cancelar
         self.btn_cancelar = QPushButton("Cancelar")
-        self.btn_cancelar.setMinimumWidth(90)  # ✅ Largura aqui
+        self.btn_cancelar.setMinimumWidth(90)
         aplicar_estilo_botao_padrao(self.btn_cancelar, cor_fundo="#6c757d", cor_texto="white")
         self.btn_cancelar.clicked.connect(self.reject)
         botoes_layout.addWidget(self.btn_cancelar)
@@ -132,14 +128,14 @@ class SelecionarSalaDialog(QDialog):
                 LEFT JOIN predios p ON p.id = s.predio_id
                 LEFT JOIN anexos a ON a.id = s.anexo_id
                 WHERE 
-                    -- Botão desmarcado: SOMENTE quem tem chave PRINCIPAL
+                    -- ✅ Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
                     (%s = FALSE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
                           AND cf.ativa = TRUE 
                           AND cf.tipo = 'principal'
                     ))
-                    -- Botão marcado: SOMENTE quem tem COPIA ou RESERVA
+                    -- ✅ Botão marcado: SOMENTE salas com CÓPIA/RESERVA
                     OR (%s = TRUE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
@@ -199,12 +195,14 @@ class SelecionarSalaDialog(QDialog):
                 LEFT JOIN predios p ON p.id = s.predio_id
                 LEFT JOIN anexos a ON a.id = s.anexo_id
                 WHERE 
+                    -- ✅ Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
                     ((%s = FALSE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
                           AND cf.ativa = TRUE 
                           AND cf.tipo = 'principal'
                     ))
+                    -- ✅ Botão marcado: SOMENTE salas com CÓPIA/RESERVA
                     OR (%s = TRUE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
@@ -213,68 +211,8 @@ class SelecionarSalaDialog(QDialog):
                     )))
                     AND (s.nome ILIKE %s OR s.descricao ILIKE %s OR p.nome ILIKE %s OR a.nome ILIKE %s)
                 ORDER BY s.nome
-            """, (filtrar_copias, filtrar_copias, filtrar_copias, filtrar_copias, f"%{texto}%", f"%{texto}%",
-                  f"%{texto}%", f"%{texto}%"))
-
-            self.preencher_tabela(cur.fetchall())
-        finally:
-            conn.close()
-
-    def aplicar_filtro(self):
-        texto = self.filtro_input.text().strip()
-        if not texto:
-            self.carregar_todas_salas()
-            return
-
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            filtrar_copias = self.apenas_copias_reserva
-
-            cur.execute("""
-                SELECT DISTINCT 
-                    s.id, 
-                    s.nome AS sala, 
-                    s.descricao, 
-                    COALESCE(p.nome, '') AS predio, 
-                    COALESCE(a.nome, '') AS anexo,
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM movimentacoes m
-                            WHERE m.sala_id = s.id
-                              AND m.data_retorno IS NULL
-                              AND (NOW() - m.data_retirada) > INTERVAL '24 hours'
-                        ) THEN 'atraso'
-                        WHEN EXISTS (
-                            SELECT 1 FROM movimentacoes m
-                            WHERE m.sala_id = s.id
-                              AND m.data_retorno IS NULL
-                        ) OR EXISTS (
-                            SELECT 1 FROM chaves_fisicas cf2
-                            WHERE cf2.sala_id = s.id
-                              AND cf2.ativa = TRUE
-                              AND cf2.status = 'retirada'
-                        ) THEN 'retirada'
-                        ELSE 'disponivel'
-                    END AS status
-                FROM salas s
-                LEFT JOIN predios p ON p.id = s.predio_id
-                LEFT JOIN anexos a ON a.id = s.anexo_id
-                WHERE 
-                    ((%s = TRUE AND EXISTS (
-                        SELECT 1 FROM chaves_fisicas cf
-                        WHERE cf.sala_id = s.id 
-                          AND cf.ativa = TRUE 
-                          AND cf.tipo IN ('copia', 'reserva')
-                    ))
-                    OR (%s = FALSE AND EXISTS (
-                        SELECT 1 FROM chaves_fisicas cf
-                        WHERE cf.sala_id = s.id 
-                          AND cf.ativa = TRUE
-                    )))
-                    AND (s.nome ILIKE %s OR s.descricao ILIKE %s OR p.nome ILIKE %s OR a.nome ILIKE %s)
-                ORDER BY s.nome
-            """, (filtrar_copias, filtrar_copias, f"%{texto}%", f"%{texto}%", f"%{texto}%", f"%{texto}%"))
+            """, (filtrar_copias, filtrar_copias, filtrar_copias, filtrar_copias,
+                  f"%{texto}%", f"%{texto}%", f"%{texto}%", f"%{texto}%"))
 
             self.preencher_tabela(cur.fetchall())
         finally:
@@ -305,61 +243,6 @@ class SelecionarSalaDialog(QDialog):
 
             self.table.setItem(idx, 4, item_status)
             self.table.item(idx, 0).setData(Qt.ItemDataRole.UserRole, sala_id)
-
-    def aplicar_filtro(self):
-        texto = self.filtro_input.text().strip()
-        if not texto:
-            self.carregar_todas_salas()
-            return
-
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            tipo_filtrado = 'reserva' if self.apenas_copias_reserva else 'principal'
-
-            cur.execute("""
-                SELECT DISTINCT 
-                    s.id, 
-                    s.nome AS sala, 
-                    s.descricao, 
-                    COALESCE(p.nome, '') AS predio, 
-                    COALESCE(a.nome, '') AS anexo,
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM movimentacoes m
-                            WHERE m.sala_id = s.id
-                              AND m.data_retorno IS NULL
-                              AND (NOW() - m.data_retirada) > INTERVAL '24 hours'
-                        ) THEN 'atraso'
-                        WHEN EXISTS (
-                            SELECT 1 FROM movimentacoes m
-                            WHERE m.sala_id = s.id
-                              AND m.data_retorno IS NULL
-                        ) OR EXISTS (
-                            SELECT 1 FROM chaves_fisicas cf2
-                            WHERE cf2.sala_id = s.id
-                              AND cf2.ativa = TRUE
-                              AND cf2.status = 'retirada'
-                              AND cf2.tipo = %s
-                        ) THEN 'retirada'
-                        ELSE 'disponivel'
-                    END AS status
-                FROM salas s
-                LEFT JOIN predios p ON p.id = s.predio_id
-                LEFT JOIN anexos a ON a.id = s.anexo_id
-                WHERE EXISTS (
-                    SELECT 1 FROM chaves_fisicas cf
-                    WHERE cf.sala_id = s.id
-                      AND cf.ativa = TRUE
-                      AND cf.tipo = %s
-                )
-                AND (s.nome ILIKE %s OR s.descricao ILIKE %s OR p.nome ILIKE %s OR a.nome ILIKE %s)
-                ORDER BY s.nome
-            """, (tipo_filtrado, tipo_filtrado, f"%{texto}%", f"%{texto}%", f"%{texto}%", f"%{texto}%"))
-
-            self.preencher_tabela(cur.fetchall())
-        finally:
-            conn.close()
 
     def aceitar_duplo_clique(self):
         if self.table.currentRow() >= 0:

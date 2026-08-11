@@ -200,7 +200,7 @@ def listar_movimentacoes(data_ini=None, data_fim=None):
         query = """
             SELECT
                 m.id,
-                COALESCE(m.chave, cf.etiqueta, '') AS chave_display,
+                COALESCE(cf.etiqueta, m.chave, '') AS chave_display,
                 m.chave_fisica_id,
                 CASE
                     WHEN COALESCE(s.nome, '') <> '' AND COALESCE(s.descricao, '') <> ''
@@ -260,7 +260,7 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
         query = """
             SELECT
                 m.id,
-                COALESCE(m.chave, cf.etiqueta, '') AS chave_display,
+                COALESCE(cf.etiqueta, m.chave, '') AS chave_display,
                 m.chave_fisica_id,
                 CASE
                     WHEN COALESCE(s.nome, '') <> '' AND COALESCE(s.descricao, '') <> ''
@@ -287,7 +287,7 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
         params = []
 
         if chave:
-            query += " AND COALESCE(m.chave, cf.etiqueta, '') ILIKE %s"
+            query += " AND COALESCE(cf.etiqueta, m.chave, '') ILIKE %s"
             params.append(f"%{chave.strip()}%")
 
         if usuario:
@@ -941,8 +941,10 @@ class MovimentacoesTab(QWidget):
                     retirada = dados[6]
                     devolucao = dados[7]
 
+                    # Primeiro aplica a cor padrão (disponível/indisponível normal)
                     aplicar_cor_status_item_generico(item, status, retirada, devolucao, now)
 
+                    # Aplica VERMELHO SOMENTE se: indisponível E passou de 12h
                     if status == "indisponivel" and _esta_em_atraso(retirada, now):
                         item.setBackground(QBrush(QColor("#ffcccc")))
                         item.setForeground(QBrush(QColor("#b71c1c")))

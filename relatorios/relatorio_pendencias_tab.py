@@ -1,56 +1,45 @@
-import logging
-from datetime import datetime, timedelta
-
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QMessageBox, QHeaderView, QLabel,
-    QProgressBar, QAbstractItemView, QDateEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QDateEdit, QLabel, QHeaderView, QMessageBox, QFileDialog
 )
+from PyQt6.QtCore import Qt, QDate, QThread, pyqtSignal
+from datetime import datetime
+import csv
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 from autenticacao.helpers_autenticacao import get_db_connection
+from utils.utils import formatar_data_br
 from utils.button_style import aplicar_estilo_botao_padrao
-
-logger = logging.getLogger(__name__)
-
-
-def formatar_data_br(data_str):
-    if not data_str:
-        return "—"
-    try:
-        if isinstance(data_str, datetime):
-            return data_str.strftime("%d/%m/%Y %H:%M")
-        return datetime.strptime(str(data_str), "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M")
-    except Exception:
-        s = str(data_str)
-        return s[:16] if len(s) > 16 else s
 
 
 class PendenciasLoader(QThread):
-    data_loaded = pyqtSignal(list, int)
-    error_occurred = pyqtSignal(str)
+    dados_carregados = pyqtSignal(list)
+    erro = pyqtSignal(str)
 
-    def __init__(self, data_inicio=None, data_fim=None, parent=None):
-        super().__init__(parent)
-        self.data_inicio = data_inicio
+    def __init__(self, data_ini, data_fim):
+        super().__init__()
+        self.data_ini = data_ini
         self.data_fim = data_fim
 
     def run(self):
-        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
 
+            # ✅ Consulta CORRETA para o seu banco
             sql = """
                 SELECT
-                    m.chave,
+                    cf.etiqueta,
                     COALESCE(u.nome, m.usuario) AS utilizador,
                     m.status,
                     m.data_retirada,
                     m.data_retorno,
                     m.id
                 FROM movimentacoes m
+                INNER JOIN chaves_fisicas cf ON cf.id = m.chave_fisica_id
                 LEFT JOIN utilizadores u ON u.id = m.utilizador_id
                 WHERE
                     m.status = 'indisponivel'
@@ -59,168 +48,149 @@ class PendenciasLoader(QThread):
                 LIMIT 1000
             """
 
-            inicio = self.data_inicio or (datetime.now() - timedelta(days=90))
-            fim = self.data_fim or datetime.now()
+            cursor.execute(sql, (self.data_ini, self.data_fim))
+            resultados = cursor.fetchall()
+            conn.close()
 
-            cursor.execute(sql, (inicio, fim))
-            rows = cursor.fetchall()
-            self.data_loaded.emit(rows, len(rows))
-
+            self.dados_carregados.emit(resultados)
         except Exception as e:
-            logger.exception("Erro ao carregar pendências")
-            self.error_occurred.emit(str(e))
-        finally:
-            try:
-                if conn:
-                    conn.close()
-            except Exception:
-                pass
+            self.erro.emit(str(e))
 
 
 class RelatorioPendenciasTab(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
         self.loader = None
-        self.carregando = False
-
-        self._setup_ui()
+        self.init_ui()
         self.carregar_pendencias()
 
-    def _icone(self, nome):
-        caminhos = {
-            "refresh": "icons/refresh.png",
-        }
-        caminho = caminhos.get(nome, "")
-        return QIcon(caminho) if caminho else QIcon()
-
-    def _setup_ui(self):
+    def init_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        layout.addWidget(QLabel("<h2>Relatório de Pendências</h2>"))
 
         filtro_layout = QHBoxLayout()
-        filtro_layout.addWidget(QLabel("Período:"))
+        filtro_layout.setSpacing(15)
 
-        self.data_inicio = QDateEdit()
+        self.data_inicio = QDateEdit(calendarPopup=True)
         self.data_inicio.setDisplayFormat("dd/MM/yyyy")
-        self.data_inicio.setCalendarPopup(True)
-        self.data_inicio.setDate((datetime.now() - timedelta(days=90)).date())
+        self.data_inicio.setDate(QDate.currentDate().addDays(-7))
 
-        self.data_fim = QDateEdit()
+        self.data_fim = QDateEdit(calendarPopup=True)
         self.data_fim.setDisplayFormat("dd/MM/yyyy")
-        self.data_fim.setCalendarPopup(True)
-        self.data_fim.setDate(datetime.now().date())
+        self.data_fim.setDate(QDate.currentDate())
 
-        filtro_layout.addWidget(QLabel("De:"))
+        self.btn_carregar = QPushButton("Atualizar")
+        aplicar_estilo_botao_padrao(self.btn_carregar, cor_fundo="#007bff", cor_texto="white")
+        self.btn_carregar.clicked.connect(self.carregar_pendencias)
+
+        filtro_layout.addWidget(QLabel("Data Início:"))
         filtro_layout.addWidget(self.data_inicio)
-        filtro_layout.addWidget(QLabel("Até:"))
+        filtro_layout.addWidget(QLabel("Data Fim:"))
         filtro_layout.addWidget(self.data_fim)
+        filtro_layout.addWidget(self.btn_carregar)
         filtro_layout.addStretch()
 
         layout.addLayout(filtro_layout)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Chave", "Utilizador", "Status", "Data Retirada", "Data Retorno"
+            "ID", "Chave", "Utilizador", "Status", "Retirada", "Devolução"
         ])
-        self._configurar_tabela()
+
+        cabecalho = self.table.horizontalHeader()
+        cabecalho.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        cabecalho.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        cabecalho.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        cabecalho.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        cabecalho.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        cabecalho.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
 
-        bottom = QHBoxLayout()
-
-        self.label_status = QLabel("Pendências: 0")
-
-        self.progress = QProgressBar()
-        self.progress.setMaximum(0)
-        self.progress.setVisible(False)
-        self.progress.setFixedWidth(160)
-
-        self.btn_atualizar = QPushButton("Atualizar")
-        self.btn_atualizar.setIcon(self._icone("refresh"))
-        self.btn_atualizar.setIconSize(QSize(18, 18))
-        aplicar_estilo_botao_padrao(self.btn_atualizar, "#0d6efd", "#ffffff")
-        self.btn_atualizar.clicked.connect(self.carregar_pendencias)
-
-        bottom.addWidget(self.label_status)
-        bottom.addStretch()
-        bottom.addWidget(self.progress)
-        bottom.addWidget(self.btn_atualizar)
-
-        layout.addLayout(bottom)
-
-    def _configurar_tabela(self):
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-
-        self.table.setAlternatingRowColors(True)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSortingEnabled(False)
-
-    def _set_carregando(self, ativo: bool):
-        self.carregando = ativo
-        self.progress.setVisible(ativo)
-        self.btn_atualizar.setEnabled(not ativo)
-        if ativo:
-            self.label_status.setText("Carregando pendências...")
+        export_layout = QHBoxLayout()
+        self.btn_csv = QPushButton("Exportar CSV")
+        self.btn_csv.clicked.connect(self.exportar_csv)
+        self.btn_pdf = QPushButton("Exportar PDF")
+        self.btn_pdf.clicked.connect(self.exportar_pdf)
+        export_layout.addWidget(self.btn_csv)
+        export_layout.addWidget(self.btn_pdf)
+        export_layout.addStretch()
+        layout.addLayout(export_layout)
 
     def carregar_pendencias(self):
-        if self.carregando:
+        if self.loader and self.loader.isRunning():
             return
 
-        inicio = datetime.combine(self.data_inicio.date().toPyDate(), datetime.min.time())
-        fim = datetime.combine(self.data_fim.date().toPyDate(), datetime.max.time())
+        ini = self.data_inicio.date().toString("yyyy-MM-dd") + " 00:00:00"
+        fim = self.data_fim.date().toString("yyyy-MM-dd") + " 23:59:59"
 
-        if inicio > fim:
-            QMessageBox.warning(self, "Período inválido", "A data inicial não pode ser maior que a data final.")
-            return
+        self.table.setRowCount(0)
+        self.btn_carregar.setEnabled(False)
+        self.btn_carregar.setText("Carregando...")
 
-        self._set_carregando(True)
-
-        self.loader = PendenciasLoader(data_inicio=inicio, data_fim=fim, parent=self)
-        self.loader.data_loaded.connect(self._atualizar_tabela)
-        self.loader.error_occurred.connect(self._mostrar_erro)
-        self.loader.finished.connect(self._finalizar_carregamento)
-        self.loader.finished.connect(self.loader.deleteLater)
+        self.loader = PendenciasLoader(ini, fim)
+        self.loader.dados_carregados.connect(self.mostrar_dados)
+        self.loader.erro.connect(self.mostrar_erro)
+        self.loader.finished.connect(self.finalizar_carregamento)
         self.loader.start()
 
-    def _finalizar_carregamento(self):
-        self.carregando = False
-        self.progress.setVisible(False)
-        self.btn_atualizar.setEnabled(True)
-        self.loader = None
+    def mostrar_dados(self, linhas):
+        self.table.setRowCount(0)
+        for idx, (chave, util, status, retirada, retorno, mid) in enumerate(linhas):
+            self.table.insertRow(idx)
+            self.table.setItem(idx, 0, QTableWidgetItem(str(mid)))
+            self.table.setItem(idx, 1, QTableWidgetItem(str(chave or "")))
+            self.table.setItem(idx, 2, QTableWidgetItem(str(util or "")))
+            self.table.setItem(idx, 3, QTableWidgetItem(str(status or "")))
+            self.table.setItem(idx, 4, QTableWidgetItem(formatar_data_br(retirada)))
+            self.table.setItem(idx, 5, QTableWidgetItem(formatar_data_br(retorno)))
 
-    def _atualizar_tabela(self, rows, total):
-        self.table.setUpdatesEnabled(False)
-        self.table.clearContents()
-        self.table.setRowCount(len(rows))
+    def mostrar_erro(self, msg):
+        QMessageBox.critical(self, "Erro", f"Falha ao carregar pendências:\n{msg}")
 
-        for i, row in enumerate(rows):
-            chave, utilizador, status, dt_retirada, dt_retorno, mov_id = row
+    def finalizar_carregamento(self):
+        self.btn_carregar.setEnabled(True)
+        self.btn_carregar.setText("Atualizar")
 
-            item0 = QTableWidgetItem(str(chave or "—"))
-            item1 = QTableWidgetItem(str(utilizador or "—"))
-            item2 = QTableWidgetItem(str(status or "—"))
-            item3 = QTableWidgetItem(formatar_data_br(dt_retirada))
-            item4 = QTableWidgetItem(formatar_data_br(dt_retorno))
+    def obter_dados_tabela(self):
+        cab = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+        dados = []
+        for l in range(self.table.rowCount()):
+            dados.append([self.table.item(l, c).text() if self.table.item(l, c) else ""
+                          for c in range(self.table.columnCount())])
+        return cab, dados
 
-            for item in (item0, item1, item2, item3, item4):
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    def exportar_csv(self):
+        cam, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "CSV (*.csv)")
+        if not cam:
+            return
+        cab, dados = self.obter_dados_tabela()
+        with open(cam, "w", newline="", encoding="utf-8-sig") as f:
+            esc = csv.writer(f, delimiter=";")
+            esc.writerow(cab)
+            esc.writerows(dados)
+        QMessageBox.information(self, "OK", "CSV salvo!")
 
-            self.table.setItem(i, 0, item0)
-            self.table.setItem(i, 1, item1)
-            self.table.setItem(i, 2, item2)
-            self.table.setItem(i, 3, item3)
-            self.table.setItem(i, 4, item4)
-
-        self.table.setUpdatesEnabled(True)
-        self.label_status.setText(f"Pendências: {total}")
-
-    def _mostrar_erro(self, msg):
-        self.label_status.setText("Erro ao carregar pendências")
-        QMessageBox.critical(self, "Erro", f"Erro ao carregar pendências:\n{msg}")
+    def exportar_pdf(self):
+        cam, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF (*.pdf)")
+        if not cam:
+            return
+        cab, dados = self.obter_dados_tabela()
+        est = getSampleStyleSheet()
+        doc = SimpleDocTemplate(cam, pagesize=landscape(A4))
+        tab = Table([cab] + dados, repeatRows=1)
+        tab.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.darkblue),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 8),
+            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ]))
+        doc.build([Paragraph("Relatório de Pendências", est["Title"]), Spacer(1,10), tab])
+        QMessageBox.information(self, "OK", "PDF salvo!")

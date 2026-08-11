@@ -2,7 +2,40 @@ import os
 from PyQt6.QtWidgets import QMessageBox
 
 from autenticacao.helpers_autenticacao import get_db_connection
+from datetime import datetime
 
+def _parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+
+    texto = str(value).strip()
+    formatos = (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+    )
+
+    for fmt in formatos:
+        try:
+            return datetime.strptime(texto, fmt)
+        except Exception:
+            continue
+
+    try:
+        return datetime.fromisoformat(texto.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def formatar_data_br(data_val):
+    dt = _parse_datetime(data_val)
+    if not dt:
+        return "" if data_val is None else str(data_val)
+    return dt.strftime("%d/%m/%Y %H:%M:%S")
 
 def montar_display_sala_variavel(nome, predio, anexo):
     # garante que tudo é str, não bytes

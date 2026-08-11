@@ -1,4 +1,3 @@
-# main.py
 import sys
 import traceback
 
@@ -8,6 +7,7 @@ from autenticacao.login_window import LoginWindow
 from autenticacao.session import session_manager
 from interface.dash_main import DashMain
 from utils.utils_log import log_acao
+from utils.caminhos import caminho_recurso  # ✅ Importa do arquivo novo
 from pathlib import Path
 
 
@@ -21,11 +21,12 @@ class MainApp:
 
     def carregar_qss_global(self):
         try:
-            qss_path = Path(__file__).parent / "styles" / "app.qss"
+            qss_path = Path(caminho_recurso("styles/app.qss"))
             if qss_path.exists():
                 self.app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
         except Exception as e:
             print(f"Erro ao carregar QSS global: {e}")
+
 
     def mostrar_login(self):
         self.login_window = LoginWindow()
@@ -75,6 +76,7 @@ class MainApp:
             self.dash_main = None
 
         self.mostrar_login()
+
     def run(self):
         self.mostrar_login()
         sys.exit(self.app.exec())

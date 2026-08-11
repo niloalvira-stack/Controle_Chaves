@@ -7,7 +7,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('config.ini', '.'),  # ← Inclui o config.ini dentro do executável
+        ('config.ini', '.'),   # Mantém configuração
+        ('assets', 'assets'),  # ✅ Inclui toda a pasta assets (logo, ícones)
     ],
     hiddenimports=[
         'psycopg2',
@@ -42,7 +43,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # ← Janela preta fechada
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

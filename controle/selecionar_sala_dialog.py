@@ -95,12 +95,12 @@ class SelecionarSalaDialog(QDialog):
             filtrar_copias = self.apenas_copias_reserva
 
             cur.execute("""
-                SELECT DISTINCT 
+                SELECT 
                     s.id, 
                     s.nome AS sala, 
                     s.descricao, 
-                    COALESCE(p.nome, '') AS predio, 
-                    COALESCE(a.nome, '') AS anexo,
+                    COALESCE(MAX(p.nome), '') AS predio, 
+                    COALESCE(MAX(a.nome), '') AS anexo,
                     CASE 
                         WHEN EXISTS (
                             SELECT 1 FROM movimentacoes m
@@ -128,20 +128,21 @@ class SelecionarSalaDialog(QDialog):
                 LEFT JOIN predios p ON p.id = s.predio_id
                 LEFT JOIN anexos a ON a.id = s.anexo_id
                 WHERE 
-                    -- ✅ Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
+                    -- Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
                     (%s = FALSE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
                           AND cf.ativa = TRUE 
                           AND cf.tipo = 'principal'
                     ))
-                    -- ✅ Botão marcado: SOMENTE salas com CÓPIA/RESERVA
+                    -- Botão marcado: SOMENTE salas com CÓPIA/RESERVA
                     OR (%s = TRUE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
                           AND cf.ativa = TRUE 
                           AND cf.tipo IN ('copia', 'reserva')
                     ))
+                GROUP BY s.id, s.nome, s.descricao
                 ORDER BY s.nome, s.descricao
             """, (filtrar_copias, filtrar_copias, filtrar_copias, filtrar_copias))
 
@@ -195,14 +196,14 @@ class SelecionarSalaDialog(QDialog):
                 LEFT JOIN predios p ON p.id = s.predio_id
                 LEFT JOIN anexos a ON a.id = s.anexo_id
                 WHERE 
-                    -- ✅ Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
+                    -- Botão desmarcado: SOMENTE salas com CHAVE PRINCIPAL
                     ((%s = FALSE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 
                           AND cf.ativa = TRUE 
                           AND cf.tipo = 'principal'
                     ))
-                    -- ✅ Botão marcado: SOMENTE salas com CÓPIA/RESERVA
+                    -- Botão marcado: SOMENTE salas com CÓPIA/RESERVA
                     OR (%s = TRUE AND EXISTS (
                         SELECT 1 FROM chaves_fisicas cf
                         WHERE cf.sala_id = s.id 

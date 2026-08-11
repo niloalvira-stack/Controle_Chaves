@@ -21,8 +21,8 @@ print("DEBUG: carregando admin/salas.py - classe SalasTab nova")
 
 
 class SalaDialog(QDialog):
-    # ✅ Adicionei o parametro tipo_chave e o combo novo
-    def __init__(self, predios, anexos, nome="", descricao="", predio_id=None, anexo_id=None, tipo_chave="principal", parent=None):
+    def __init__(self, predios, anexos, nome="", descricao="", predio_id=None, anexo_id=None, tipo_chave="principal",
+                 pode_ser_principal=True, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Cadastro/Editar Sala")
 
@@ -69,11 +69,11 @@ class SalaDialog(QDialog):
             if idx >= 0:
                 self.combo_anexo.setCurrentIndex(idx)
 
-        # ✅ CAMPO NOVO: TIPO DA CHAVE
         self.combo_tipo_chave = QComboBox()
-        self.combo_tipo_chave.addItem("Chave Principal", "principal")
+        if pode_ser_principal:
+            self.combo_tipo_chave.addItem("Chave Principal", "principal")
         self.combo_tipo_chave.addItem("Cópia / Reserva", "reserva")
-        # Seleciona o valor atual
+
         idx_tipo = self.combo_tipo_chave.findData(tipo_chave)
         if idx_tipo >= 0:
             self.combo_tipo_chave.setCurrentIndex(idx_tipo)
@@ -82,7 +82,7 @@ class SalaDialog(QDialog):
         layout.addRow("Descrição:", self.descricao_edit)
         layout.addRow("Prédio:", self.combo_predio)
         layout.addRow("Anexo:", self.combo_anexo)
-        layout.addRow("Tipo de Chave Vinculada:", self.combo_tipo_chave) # ✅ Adicionado
+        layout.addRow("Tipo de Chave Vinculada:", self.combo_tipo_chave)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -97,7 +97,7 @@ class SalaDialog(QDialog):
             "descricao": self.descricao_edit.text().strip(),
             "predio_id": self.combo_predio.currentData(),
             "anexo_id": self.combo_anexo.currentData(),
-            "tipo_chave": self.combo_tipo_chave.currentData(), # ✅ Retorna o tipo escolhido
+            "tipo_chave": self.combo_tipo_chave.currentData(),
         }
 
 
@@ -151,8 +151,9 @@ class SalasTab(QWidget):
         layout_principal.addLayout(layout_botoes)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Nome", "Descrição", "Prédio", "Anexo", "Status"])
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Nome", "Descrição", "Prédio", "Anexo", "Chave Principal", "Chave Reserva", "Status"])
 
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -161,6 +162,8 @@ class SalasTab(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
 
         self.table.setColumnHidden(0, True)
         self.table.setAlternatingRowColors(True)
@@ -221,13 +224,13 @@ class SalasTab(QWidget):
                 return int(texto)
 
         return None
+
     def fetch_predios(self):
         conn = None
         try:
             conn = get_connection()
             if conn is None:
                 return []
-
             cursor = conn.cursor()
             cursor.execute("SELECT id, nome FROM predios ORDER BY nome")
             return cursor.fetchall()
@@ -243,7 +246,6 @@ class SalasTab(QWidget):
             conn = get_connection()
             if conn is None:
                 return []
-
             cursor = conn.cursor()
             cursor.execute("SELECT id, nome FROM anexos ORDER BY nome")
             return cursor.fetchall()
@@ -268,10 +270,14 @@ class SalasTab(QWidget):
                        s.descricao,
                        p.nome AS predio_nome,
                        a.nome AS anexo_nome,
+                       SUM(CASE WHEN cf.tipo = 'principal' THEN 1 ELSE 0 END) AS qtd_principal,
+                       SUM(CASE WHEN cf.tipo = 'reserva' THEN 1 ELSE 0 END) AS qtd_reserva,
                        s.status
                 FROM salas s
                 LEFT JOIN predios p ON s.predio_id = p.id
                 LEFT JOIN anexos a ON s.anexo_id = a.id
+                LEFT JOIN chaves_fisicas cf ON s.id = cf.sala_id
+                GROUP BY s.id, s.nome, s.descricao, p.nome, a.nome, s.status
                 ORDER BY s.nome
             """)
             salas = cursor.fetchall()
@@ -284,6 +290,8 @@ class SalasTab(QWidget):
                     descricao = row.get("descricao")
                     predio_nome = row.get("predio_nome")
                     anexo_nome = row.get("anexo_nome")
+                    qtd_principal = row.get("qtd_principal", 0)
+                    qtd_reserva = row.get("qtd_reserva", 0)
                     status = row.get("status")
                 else:
                     sid = self._row_get(row, 0)
@@ -291,7 +299,9 @@ class SalasTab(QWidget):
                     descricao = self._row_get(row, 2)
                     predio_nome = self._row_get(row, 3)
                     anexo_nome = self._row_get(row, 4)
-                    status = self._row_get(row, 5)
+                    qtd_principal = self._row_get(row, 5, 0)
+                    qtd_reserva = self._row_get(row, 6, 0)
+                    status = self._row_get(row, 7)
 
                 nome = self._decode_if_bytes(nome)
                 descricao = self._decode_if_bytes(descricao)
@@ -306,6 +316,8 @@ class SalasTab(QWidget):
                 item_desc = QTableWidgetItem(descricao or "")
                 item_predio = QTableWidgetItem(predio_nome or "")
                 item_anexo = QTableWidgetItem(anexo_nome or "")
+                item_principal = QTableWidgetItem(str(qtd_principal))
+                item_reserva = QTableWidgetItem(str(qtd_reserva))
                 item_status = QTableWidgetItem(status or "")
 
                 item_nome.setData(Qt.ItemDataRole.UserRole, sid)
@@ -315,7 +327,9 @@ class SalasTab(QWidget):
                 self.table.setItem(row_idx, 2, item_desc)
                 self.table.setItem(row_idx, 3, item_predio)
                 self.table.setItem(row_idx, 4, item_anexo)
-                self.table.setItem(row_idx, 5, item_status)
+                self.table.setItem(row_idx, 5, item_principal)
+                self.table.setItem(row_idx, 6, item_reserva)
+                self.table.setItem(row_idx, 7, item_status)
 
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar salas: {e}")
@@ -330,7 +344,7 @@ class SalasTab(QWidget):
         predios = self.fetch_predios()
         anexos = self.fetch_anexos()
 
-        dialog = SalaDialog(predios, anexos, parent=self)
+        dialog = SalaDialog(predios, anexos, pode_ser_principal=True, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             data = dialog.get_data()
             nome = data["nome"]
@@ -347,7 +361,6 @@ class SalasTab(QWidget):
                     return
 
                 cursor = conn.cursor()
-                # 1. INSERE A SALA
                 cursor.execute(
                     """
                     INSERT INTO salas (nome, descricao, predio_id, anexo_id, status)
@@ -362,8 +375,10 @@ class SalasTab(QWidget):
 
                 sala_id = res[0] if isinstance(res, (list, tuple)) else res.get("id")
 
-                # ✅ CORREÇÃO: CRIA A CHAVE FÍSICA AUTOMATICAMENTE!
                 etiqueta = f"{nome} - {data['descricao']}" if data["descricao"] else nome
+                if tipo_chave == "reserva":
+                    etiqueta += " - Reserva"
+
                 cursor.execute(
                     """
                     INSERT INTO chaves_fisicas (sala_id, etiqueta, tipo, status, ativa)
@@ -380,7 +395,6 @@ class SalasTab(QWidget):
                 if conn:
                     conn.rollback()
                 QMessageBox.critical(self, "Erro", f"Falha: {repr(e)}")
-
             finally:
                 if conn:
                     conn.close()
@@ -416,7 +430,6 @@ class SalasTab(QWidget):
                 pname = row_predio.get("nome")
             else:
                 pid, pname = row_predio
-
             pname = self._decode_if_bytes(pname)
             if pname == predio_nome_atual:
                 predio_id_atual = pid
@@ -429,24 +442,39 @@ class SalasTab(QWidget):
                 aname = row_anexo.get("nome")
             else:
                 aid, aname = row_anexo
-
             aname = self._decode_if_bytes(aname)
             if aname == anexo_nome_atual:
                 anexo_id_atual = aid
                 break
 
-        # ✅ BUSCA O TIPO ATUAL DA CHAVE PARA PREENCHER O FORMULÁRIO
         tipo_atual = "principal"
+        qtd_principal = 0
         conn_tmp = get_connection()
         try:
             cur_tmp = conn_tmp.cursor()
             cur_tmp.execute("SELECT tipo FROM chaves_fisicas WHERE sala_id = %s AND ativa = TRUE LIMIT 1", (sala_id,))
             res = cur_tmp.fetchone()
             if res:
-                # ✅ Funciona com tupla OU dicionário
                 tipo_atual = res[0] if isinstance(res, (list, tuple)) else res.get("tipo", "principal")
+
+            cur_tmp.execute(
+                "SELECT COUNT(*) AS qtd FROM chaves_fisicas WHERE sala_id = %s AND tipo = 'principal' AND ativa = TRUE",
+                (sala_id,)
+            )
+            resultado = cur_tmp.fetchone()
+
+            if resultado:
+                if isinstance(resultado, dict):
+                    qtd_principal = resultado.get("qtd", 0)
+                else:
+                    qtd_principal = resultado[0]
+            else:
+                qtd_principal = 0
+
         finally:
             conn_tmp.close()
+
+        pode_ser_principal = (qtd_principal == 0) or (tipo_atual == "principal")
 
         dialog = SalaDialog(
             predios,
@@ -456,6 +484,7 @@ class SalasTab(QWidget):
             predio_id=predio_id_atual,
             anexo_id=anexo_id_atual,
             tipo_chave=tipo_atual,
+            pode_ser_principal=pode_ser_principal,
             parent=self
         )
 
@@ -475,7 +504,12 @@ class SalasTab(QWidget):
                     return
 
                 cursor = conn.cursor()
-                # 1. Atualiza dados da sala
+
+                if tipo_chave == "principal" and qtd_principal >= 1 and tipo_atual != "principal":
+                    QMessageBox.warning(self, "Atenção",
+                                        "Essa sala já possui uma Chave Principal! Cada sala só pode ter 1 chave principal.")
+                    return
+
                 cursor.execute(
                     """
                     UPDATE salas
@@ -484,14 +518,18 @@ class SalasTab(QWidget):
                     """,
                     (nome_novo, data["descricao"], data["predio_id"], data["anexo_id"], sala_id),
                 )
-                # ✅ 2. ATUALIZA O TIPO NA CHAVE FÍSICA
+
+                etiqueta_nova = f"{nome_novo} - {data['descricao']}" if data["descricao"] else nome_novo
+                if tipo_chave == "reserva":
+                    etiqueta_nova += " - Reserva"
+
                 cursor.execute(
                     """
                     UPDATE chaves_fisicas
-                    SET tipo = %s, atualizada_em = CURRENT_TIMESTAMP
+                    SET tipo = %s, etiqueta = %s, atualizada_em = CURRENT_TIMESTAMP
                     WHERE sala_id = %s AND ativa = TRUE
                     """,
-                    (tipo_chave, sala_id)
+                    (tipo_chave, etiqueta_nova, sala_id)
                 )
 
                 conn.commit()
@@ -504,7 +542,6 @@ class SalasTab(QWidget):
             finally:
                 if conn:
                     conn.close()
-
 
     def excluir_sala(self):
         row = self.table.currentRow()
@@ -565,23 +602,19 @@ class SalasTab(QWidget):
                 col for col in range(self.table.columnCount())
                 if not self.table.isColumnHidden(col)
             ]
-
             headers = [
                 self.table.horizontalHeaderItem(col).text()
                 for col in colunas_visiveis
             ]
-
             with open(filename, "w", newline="", encoding="utf-8") as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(headers)
-
                 for row in range(self.table.rowCount()):
                     rowdata = []
                     for col in colunas_visiveis:
                         item = self.table.item(row, col)
                         rowdata.append(item.text() if item else "")
                     writer.writerow(rowdata)
-
             self._show_success("Salas exportadas para CSV com sucesso.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao exportar CSV: {e}")
@@ -604,14 +637,11 @@ class SalasTab(QWidget):
                 col for col in range(self.table.columnCount())
                 if not self.table.isColumnHidden(col)
             ]
-
             headers = [
                 Paragraph(self.table.horizontalHeaderItem(col).text(), styles["Heading5"])
                 for col in colunas_visiveis
             ]
-
             data = [headers]
-
             for row in range(self.table.rowCount()):
                 rowdata = []
                 for col in colunas_visiveis:
@@ -621,7 +651,6 @@ class SalasTab(QWidget):
                 data.append(rowdata)
 
             doc = SimpleDocTemplate(filename, pagesize=A4)
-
             largura_util = A4[0] - doc.leftMargin - doc.rightMargin
             qtd_cols = len(colunas_visiveis)
             col_width = largura_util / qtd_cols if qtd_cols else largura_util

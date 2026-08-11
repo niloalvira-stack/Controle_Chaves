@@ -14,7 +14,9 @@ from controle.movimentacoes import MovimentacoesTab, ha_chaves_em_atraso, verifi
 from relatorios.relatorios_tab import RelatoriosTab
 from autenticacao import session_manager
 from utils.utils_log import get_logger
+
 import config
+from utils.caminhos import caminho_recurso  # ✅ Importa a função que resolve o caminho
 
 logger = get_logger(__name__)
 
@@ -66,7 +68,7 @@ class DashMain(QMainWindow):
         self.label_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_hora.setStyleSheet(
         "QLabel { background-color: #f8f9fa; color: #212529; "
-        "font-size: 24px; font-Bold Sweight: 500; padding: 10px 14px; "
+        "font-size: 24px; font-weight: 500; padding: 10px 14px; "
         "border: 1px solid #dee2e6; border-radius: 4px; }"
          )
         topo_layout.addWidget(self.label_hora)
@@ -86,7 +88,9 @@ class DashMain(QMainWindow):
         QSizePolicy.Policy.Fixed
 )
 
-        pix = QPixmap(config.APP_LOGO_PATH)
+        # ✅ Usa caminho correto, tanto em desenvolvimento quanto compilado
+        caminho_logo = caminho_recurso(config.APP_LOGO_PATH)
+        pix = QPixmap(caminho_logo)
         if not pix.isNull():
             pix = pix.scaledToHeight(
                 120,
@@ -184,7 +188,6 @@ class DashMain(QMainWindow):
         try:
             resultado = ha_chaves_em_atraso()
 
-            # Aceita tanto 1 valor quanto 2 valores de retorno
             if isinstance(resultado, (list, tuple)) and len(resultado) == 2:
                 tem_atraso, qtd = resultado
             else:
@@ -210,7 +213,9 @@ class DashMain(QMainWindow):
             f"{config.APP_COMPANY}"
         )
 
-        pix = QPixmap(config.APP_LOGO_PATH)
+        # ✅ Também ajusta o logo da janela Sobre
+        caminho_logo = caminho_recurso(config.APP_LOGO_PATH)
+        pix = QPixmap(caminho_logo)
         if not pix.isNull():
             pix = pix.scaled(
                 96,

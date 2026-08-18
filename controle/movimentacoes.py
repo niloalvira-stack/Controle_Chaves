@@ -1219,6 +1219,9 @@ Até o momento, já se passaram **{horas_atraso:.1f} horas** sem a devolução.
 
 Solicitamos a gentileza de regularizar a situação o mais breve possível, para mantermos o controle e a segurança das instalações.
 
+OBS: Se voce ja Regularizou  ou Devolveu á Chave , Desconsidere este  e-mail
+Não ha necessidade de responder a este e-mail ele é gerado automaticamente pelo Sistema 
+
 Atenciosamente,
 IFRS – Campus Alvorada
 Sistema de Controle de Chaves

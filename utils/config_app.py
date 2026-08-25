@@ -90,7 +90,7 @@ def get_app_config():
 
     defaults = {
         "app_name": "Controle de Chaves",
-        "app_version": "1.1.6",
+        "app_version": "1.1.7",
         "app_developer": "Nilo Alvira",
         "app_company": "IFRS-Campus Alvorada / DTI",
     }

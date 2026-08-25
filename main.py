@@ -7,7 +7,7 @@ from autenticacao.login_window import LoginWindow
 from autenticacao.session import session_manager
 from interface.dash_main import DashMain
 from utils.utils_log import log_acao
-from utils.caminhos import caminho_recurso  # ✅ Importa do arquivo novo
+from utils.caminhos import caminho_recurso  # ✅ Importa do arquivo novo'
 from pathlib import Path
 
 

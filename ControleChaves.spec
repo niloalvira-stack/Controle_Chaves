@@ -1,14 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-
 block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+    ('C:\\\\Users\\\\nilo.alvira\\\\AppData\\\\Roaming\\\\Python\\\\Python313\\\\site-packages\\\\pyzbar\\\\libiconv.dll', 'pyzbar'),
+    ('C:\\\\Users\\\\nilo.alvira\\\\AppData\\\\Roaming\\\\Python\\\\Python313\\\\site-packages\\\\pyzbar\\\\libzbar-64.dll', 'pyzbar'),
+],
     datas=[
-        ('config.ini', '.'),   # Mantém configuração
-        ('assets', 'assets'),  # ✅ Inclui toda a pasta assets (logo, ícones)
+        ('config.ini', '.'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[
         'psycopg2',
@@ -16,6 +18,8 @@ a = Analysis(
         'autenticacao',
         'autenticacao.session',
         'utils',
+        'pyzbar',
+        'pyzbar.pyzbar',
     ],
     hookspath=[],
     hooksconfig={},

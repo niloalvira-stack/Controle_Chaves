@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap
+
 from admin.utilizadores_tab import UtilizadoresTab
 from admin.admin import AdminTab
 from admin.log_viewer_tab import LogViewerTab
@@ -50,45 +51,42 @@ class DashMain(QMainWindow):
         self.setCentralWidget(central_widget)
         layout_principal = QVBoxLayout(central_widget)
 
+        # ✅ AVISO DE CHAVES EM ATRASO — CORRIGIDO
         self.lblAlertaChaves = QLabel()
         self.lblAlertaChaves.setStyleSheet(
-            "QLabel { background-color: #ffcc00; color: #000; font-weight: bold; padding: 8px; }"
+            "QLabel { background-color: #ffcc00; color: #000; font-weight: bold; padding: 8px; font-size: 12pt; }"
         )
         self.lblAlertaChaves.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lblAlertaChaves.setText(
-            "Há chaves com devolução em atraso. Verifique o controle."
-        )
         self.lblAlertaChaves.hide()
         layout_principal.addWidget(self.lblAlertaChaves)
-        layout_principal.addSpacing(24)
+        layout_principal.addSpacing(12)
 
         topo_layout = QHBoxLayout()
 
         self.label_hora = QLabel()
         self.label_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_hora.setStyleSheet(
-        "QLabel { background-color: #f8f9fa; color: #212529; "
-        "font-size: 24px; font-weight: 500; padding: 10px 14px; "
-        "border: 1px solid #dee2e6; border-radius: 4px; }"
-         )
+            "QLabel { background-color: #f8f9fa; color: #212529; "
+            "font-size: 24px; font-weight: 500; padding: 10px 14px; "
+            "border: 1px solid #dee2e6; border-radius: 4px; }"
+        )
         topo_layout.addWidget(self.label_hora)
 
         topo_spacer = QSpacerItem(
-        40, 20,
-        QSizePolicy.Policy.Expanding,
-        QSizePolicy.Policy.Minimum
-    )
+            40, 20,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum
+        )
         topo_layout.addItem(topo_spacer)
         layout_principal.addLayout(topo_layout)
 
         self.logo_label = QLabel()
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.logo_label.setSizePolicy(
-        QSizePolicy.Policy.Expanding,
-        QSizePolicy.Policy.Fixed
-)
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed
+        )
 
-        # ✅ Usa caminho correto, tanto em desenvolvimento quanto compilado
         caminho_logo = caminho_recurso(config.APP_LOGO_PATH)
         pix = QPixmap(caminho_logo)
         if not pix.isNull():
@@ -176,31 +174,30 @@ class DashMain(QMainWindow):
 
         self.load_tabs()
 
+        # ✅ Timer para verificar chaves em atraso a cada 30 segundos
         self.timer_chaves_atraso = QTimer(self)
         self.timer_chaves_atraso.timeout.connect(self.verificar_chaves_atraso)
-        self.timer_chaves_atraso.start(60000)
-        self.verificar_chaves_atraso()
+        self.timer_chaves_atraso.start(30000)
+        self.verificar_chaves_atraso()  # ✅ Verifica IMEDIATAMENTE ao abrir
 
     def atualizar_hora(self):
         self.label_hora.setText(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
+    # ✅ FUNÇÃO CORRIGIDA — Aqui estava o ERRO PRINCIPAL!
     def verificar_chaves_atraso(self):
+        """Verifica quantidade de chaves em atraso e mostra aviso no topo da tela"""
         try:
-            resultado = ha_chaves_em_atraso()
+            qtd = ha_chaves_em_atraso()  # ✅ Retorna NÚMERO, não tupla!
 
-            if isinstance(resultado, (list, tuple)) and len(resultado) == 2:
-                tem_atraso, qtd = resultado
-            else:
-                tem_atraso = bool(resultado)
-                qtd = verificar_pendencias_e_enviar_emails() if tem_atraso else 0
-
-            if tem_atraso:
-                self.lblAlertaChaves.setText(f"Há {qtd} chave(s) em atraso!")
+            if qtd > 0:
+                self.lblAlertaChaves.setText(f"⚠️ HÁ {qtd} CHAVE(S) EM ATRASO! Verifique a devolução.")
                 self.lblAlertaChaves.show()
+                logger.info(f"✅ {qtd} chave(s) em atraso — aviso exibido")
             else:
                 self.lblAlertaChaves.hide()
+                logger.info("✅ Nenhuma chave em atraso")
 
-        except Exception:
+        except Exception as e:
             logger.exception("Erro ao verificar chaves em atraso")
             self.lblAlertaChaves.hide()
 
@@ -213,7 +210,6 @@ class DashMain(QMainWindow):
             f"{config.APP_COMPANY}"
         )
 
-        # ✅ Também ajusta o logo da janela Sobre
         caminho_logo = caminho_recurso(config.APP_LOGO_PATH)
         pix = QPixmap(caminho_logo)
         if not pix.isNull():

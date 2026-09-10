@@ -1,9 +1,14 @@
+import config
+from config import carregar_modo_email, salvar_modo_email
+from utils.caminhos import caminho_recurso
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialog, QFormLayout, QLineEdit, QComboBox, QHeaderView,
     QMessageBox, QFileDialog, QDateEdit, QDialogButtonBox, QLabel, QToolButton,
-    QAbstractItemView, QRadioButton, QListWidget, QListWidgetItem
+    QAbstractItemView, QListWidget, QListWidgetItem, QRadioButton, QCheckBox
 )
+
 from PyQt6.QtGui import QBrush, QColor, QImage, QPixmap
 from PyQt6.QtCore import Qt, QDate, QTimer
 from datetime import datetime, date
@@ -21,12 +26,11 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Ima
 
 from utils.ui_colors import aplicar_cor_status_item_generico
 from utils.validacao import email_valido
-from utils.utils import montar_display_sala_por_id
+from utils.utils import montar_display_sala_por_id, formatar_data_br, _parse_datetime
 from utils.utils_log import log_acao
 from .selecionar_sala_dialog import SelecionarSalaDialog
 from autenticacao.helpers_autenticacao import get_db_connection
 from autenticacao import get_current_user
-import config
 from utils.email_service import enviar_email
 
 ALERTA_HORAS = 12
@@ -88,6 +92,92 @@ def gerar_etiquetas_pdf(caminho_arquivo, lista_chaves):
     doc.build(elementos)
     return caminho_arquivo
 
+# ============================================================
+# Classe de Diálogo para Escolha de Etiquetas
+# ============================================================
+class EscolhaEtiquetasDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Gerar Etiquetas QR")
+        self.escolha = None
+        self.chaves_selecionadas = []
+
+        layout = QVBoxLayout(self)
+
+        # Opções de escolha
+        self.radio_todas = QRadioButton("Gerar para TODAS as chaves")
+        self.radio_lote = QRadioButton("Selecionar chaves em LOTE")
+        self.radio_individual = QRadioButton("Selecionar chave INDIVIDUAL")
+        self.radio_todas.setChecked(True)
+
+        layout.addWidget(QLabel("Escolha a forma de geração:"))
+        layout.addWidget(self.radio_todas)
+        layout.addWidget(self.radio_lote)
+        layout.addWidget(self.radio_individual)
+
+        # Lista de chaves (aparece apenas quando selecionar lote ou individual)
+        self.lista_chaves = QListWidget()
+        self.lista_chaves.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.lista_chaves.setVisible(False)
+        layout.addWidget(self.lista_chaves)
+
+        # Mostrar/esconder lista conforme opção selecionada
+        self.radio_todas.toggled.connect(lambda c: self.lista_chaves.setVisible(not c))
+        self.radio_lote.toggled.connect(lambda c: self.lista_chaves.setVisible(c))
+        self.radio_individual.toggled.connect(lambda c: self.lista_chaves.setVisible(c))
+
+        # Botões OK e Cancelar
+        botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        botoes.accepted.connect(self._confirmar)
+        botoes.rejected.connect(self.reject)
+        layout.addWidget(botoes)
+
+        # Carregar lista de chaves
+        self._carregar_chaves()
+
+    def _carregar_chaves(self):
+        from utils.utils_bd import get_db_connection
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT cf.id, cf.etiqueta, s.nome, s.descricao, cf.tipo 
+                FROM chaves_fisicas cf 
+                LEFT JOIN salas s ON cf.sala_id = s.id 
+                WHERE cf.ativa = TRUE 
+                ORDER BY cf.etiqueta
+            """)
+            for cid, et, sa_nome, sa_desc, tipo in cur.fetchall():
+                sala_display = f"{sa_nome} - {sa_desc}" if sa_desc else (sa_nome or "Sem sala")
+                item = QListWidgetItem(f"{et} | {sala_display} | {tipo.upper()}")
+                item.setData(1000, {"id": cid, "etiqueta": et, "sala_nome": sala_display, "tipo": tipo})
+                self.lista_chaves.addItem(item)
+        finally:
+            conn.close()
+
+    def _confirmar(self):
+        if self.radio_todas.isChecked():
+            self.escolha = "todas"
+            self.accept()
+
+        elif self.radio_lote.isChecked():
+            selecionadas = self.lista_chaves.selectedItems()
+            if not selecionadas:
+                QMessageBox.warning(self, "Atenção", "Selecione pelo menos uma chave na lista!")
+                return
+            self.escolha = "lote"
+            self.chaves_selecionadas = [item.data(1000) for item in selecionadas]
+            self.accept()
+
+        else:  # individual
+            selecionadas = self.lista_chaves.selectedItems()
+            if len(selecionadas) != 1:
+                QMessageBox.warning(self, "Atenção", "Selecione apenas UMA chave!")
+                return
+            self.escolha = "individual"
+            self.chaves_selecionadas = [selecionadas[0].data(1000)]
+            self.accept()
+
 ## ═══════ LEITURA COM LEITOR DE QR CODE (USB) ═══════
 class LeituraQRDialog(QDialog):
     def __init__(self, parent=None):
@@ -136,7 +226,6 @@ class LeituraQRDialog(QDialog):
         self.label_status.setStyleSheet("color: blue; font-weight: bold;")
 
         ok, mensagem = registrar_devolucao_por_qrcode(texto)
-
         if ok:
             self.label_status.setText("✅ " + mensagem)
             self.label_status.setStyleSheet("color: green; font-weight: bold;")
@@ -159,30 +248,20 @@ class LeituraQRDialog(QDialog):
         QTimer.singleShot(100, self.campo_codigo.setFocus)
 
 # ═══════ FUNÇÕES AUXILIARES ═══════
-def _parse_datetime(value):
-    if not value or isinstance(value, datetime):
-        return value
-    texto = str(value).strip()
-    for fmt in (
-        "%Y-%m-%d %H:%M:%S.%f",
-        "%Y-%m-%d %H:%M:%S",
-        "%d/%m/%Y %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%f"
-    ):
-        try:
-            return datetime.strptime(texto, fmt)
-        except Exception:
-            pass
-    try:
-        return datetime.fromisoformat(texto.replace("Z", "+00:00"))
-    except Exception:
-        return None
-
 def _esta_em_atraso(data_retirada, now=None):
+    """Verifica se a chave está em atraso (retirada há mais de 12h)"""
     now = now or datetime.now()
     retirada_dt = _parse_datetime(data_retirada)
-    return bool(retirada_dt and (now - retirada_dt).total_seconds() / 3600 >= ALERTA_HORAS)
+
+    if not retirada_dt:
+        return False
+
+    # ✅ Garante que AMBAS estão sem fuso horário para comparação justa
+    if hasattr(retirada_dt, 'tzinfo') and retirada_dt.tzinfo:
+        retirada_dt = retirada_dt.replace(tzinfo=None)
+
+    horas_passadas = (now - retirada_dt).total_seconds() / 3600
+    return horas_passadas >= ALERTA_HORAS
 
 def _normalizar_status(status):
     if not status: return ""
@@ -209,10 +288,6 @@ def pode_solicitar_retirada(utilizador_id: int):
     if str(vinculo or "").strip() == "Servidor(a)" or data_fim is None:
         return True, ""
     return (True, "") if date.today() <= data_fim else (False, f"Validade expirada em {data_fim.strftime('%d/%m/%Y')}")
-
-def formatar_data_br(data_val):
-    dt = _parse_datetime(data_val)
-    return dt.strftime("%d/%m/%Y %H:%M:%S") if dt else ("" if data_val is None else str(data_val))
 
 def obter_chave_fisica_disponivel_por_sala(sala_id, apenas_principal=False):
     conn = get_db_connection()
@@ -300,11 +375,19 @@ def registrar_retirada(sala_id, chave_fisica_id, utilizador_id, email, motivo_em
         cur.execute("SELECT 1 FROM movimentacoes WHERE chave_fisica_id=%s AND status='indisponivel' AND data_retorno IS NULL LIMIT 1", (chave_fisica_id,))
         if cur.fetchone(): raise ValueError("Chave já retirada")
         chave_display = etiqueta or montar_display_sala_por_id(sala_id)
+
+        # ✅ GERA HORA NO PYTHON — SEM FUSO HORÁRIO!
+        hora_atual = datetime.now().replace(tzinfo=None)
+
         cur.execute("""INSERT INTO movimentacoes (chave,chave_fisica_id,sala_id,utilizador_id,usuario,email,data_retirada,status,alerta_enviado,motivo_emprestimo)
-            VALUES (%s,%s,%s,%s,%s,%s,NOW(),'indisponivel',FALSE,%s)""",
-            (chave_display, chave_fisica_id, sala_id, utilizador_id, nome_utilizador, email, motivo_emprestimo))
+            VALUES (%s,%s,%s,%s,%s,%s,%s,'indisponivel',FALSE,%s)""",
+            (chave_display, chave_fisica_id, sala_id, utilizador_id, nome_utilizador, email, hora_atual, motivo_emprestimo))
+
         cur.execute("UPDATE salas SET status='indisponivel' WHERE id=%s", (sala_id,))
-        cur.execute("UPDATE chaves_fisicas SET status='indisponivel', atualizada_em=NOW() WHERE id=%s", (chave_fisica_id,))
+
+        # ✅ Usa a MESMA hora para atualizada_em
+        cur.execute("UPDATE chaves_fisicas SET status='indisponivel', atualizada_em=%s WHERE id=%s", (hora_atual, chave_fisica_id))
+
         conn.commit()
         return chave_display
     except Exception: conn.rollback(); raise
@@ -319,13 +402,231 @@ def registrar_devolucao(mov_id, sala_id=None):
         if _normalizar_status(status_atual) == "disponivel":
             return chave or "", chave_fisica_id, sala_id_db
         sala_id_final = sala_id_db if sala_id is None else sala_id
-        cur.execute("UPDATE movimentacoes SET data_retorno=NOW(),status='disponivel',alerta_enviado=FALSE WHERE id=%s", (mov_id,))
-        if sala_id_final: cur.execute("UPDATE salas SET status='disponivel' WHERE id=%s", (sala_id_final,))
-        if chave_fisica_id: cur.execute("UPDATE chaves_fisicas SET status='disponivel',atualizada_em=NOW() WHERE id=%s", (chave_fisica_id,))
+
+        # ✅ GERA HORA NO PYTHON — SEM FUSO HORÁRIO!
+        hora_atual = datetime.now().replace(tzinfo=None)
+
+        # ✅ Troca NOW() por %s + variável hora_atual
+        cur.execute("UPDATE movimentacoes SET data_retorno=%s,status='disponivel',alerta_enviado=FALSE WHERE id=%s", (hora_atual, mov_id))
+
+        if sala_id_final:
+            cur.execute("UPDATE salas SET status='disponivel' WHERE id=%s", (sala_id_final,))
+
+        # ✅ Troca NOW() por %s + variável hora_atual
+        if chave_fisica_id:
+            cur.execute("UPDATE chaves_fisicas SET status='disponivel',atualizada_em=%s WHERE id=%s", (hora_atual, chave_fisica_id))
+
         conn.commit()
         return chave or "", chave_fisica_id, sala_id_final
     except Exception: conn.rollback(); raise
     finally: conn.close()
+
+def ha_chaves_em_atraso():
+    """Retorna quantidade de chaves em atraso"""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT m.id, m.data_retirada
+            FROM movimentacoes m
+            WHERE m.status = 'indisponivel'
+              AND m.data_retorno IS NULL
+            ORDER BY m.data_retirada ASC
+        """)
+        linhas = cur.fetchall()
+        agora = datetime.now()
+        contador_atraso = 0
+        for mov_id, dt_retirada in linhas:
+            dt = _parse_datetime(dt_retirada)
+            if not dt:
+                continue
+            horas_passadas = (agora - dt).total_seconds() / 3600
+            if horas_passadas >= ALERTA_HORAS:
+                contador_atraso += 1
+        return contador_atraso
+    finally:
+        conn.close()
+
+def verificar_pendencias_e_enviar_emails(modo_manual=False, lista_selecionada=None):
+    """Verifica pendências — só envia automático se MODO estiver configurado; senão abre tela manual"""
+    conn = get_db_connection()
+    total_pendencias = 0
+    total_enviados = 0
+    lista_pendencias = []
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT m.id, m.chave, m.usuario, u.email, m.data_retirada, m.alerta_enviado
+            FROM movimentacoes m
+            LEFT JOIN utilizadores u ON m.utilizador_id = u.id
+            WHERE m.status = 'indisponivel' AND m.data_retorno IS NULL
+            ORDER BY m.data_retirada ASC
+        """)
+        linhas = cur.fetchall()
+        agora = datetime.now()
+        EMAIL_ENVIO_AUTOMATICO = carregar_modo_email()
+
+        for mid, chave, usuario, email, dt_ret, aviso_enviado in linhas:
+            if not dt_ret:
+                continue
+            dt = _parse_datetime(dt_ret)
+            if not dt:
+                log_acao("verificar_pendencias", "sistema", chave, "erro", f"Data inválida mov={mid}")
+                continue
+            horas_atraso = (agora - dt).total_seconds() / 3600
+            if horas_atraso < ALERTA_HORAS:
+                continue
+            total_pendencias += 1
+            lista_pendencias.append({
+                "id": mid,
+                "chave": chave,
+                "usuario": usuario,
+                "email": email or "— Sem e-mail —",
+                "dt_retirada": dt,
+                "horas_atraso": round(horas_atraso, 1),
+                "ja_enviado": aviso_enviado
+            })
+            if modo_manual:
+                if lista_selecionada and mid in lista_selecionada and not aviso_enviado:
+                    if _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
+                        total_enviados += 1
+                continue
+            if EMAIL_ENVIO_AUTOMATICO and not aviso_enviado:
+                if _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
+                    total_enviados += 1
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        log_acao("verificar_pendencias", "sistema", "-", "erro", f"Falha geral: {e}")
+    finally:
+        conn.close()
+    return total_pendencias, total_enviados, lista_pendencias
+
+def _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
+    """Envia o e-mail e marca alerta_enviado=True"""
+    if not email:
+        cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s",
+                    ("Sem e-mail cadastrado", mid))
+        return False
+    if not email_valido(email):
+        cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s",
+                    (f"E-mail inválido: {email}", mid))
+        return False
+
+    ass = f"📌 Lembrando: Devolução da Chave {chave}"
+    corpo = f"""<html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">
+<h2 style="color:#2c5aa0;">Lembrando da Devolução</h2>
+<p>Olá, <strong>{usuario}</strong>!</p>
+<p>Passando para lembrar-lhe de que a chave <strong>{chave}</strong> ainda não foi devolvida. Ela foi retirada em <strong>{formatar_data_br(dt)}</strong>.</p>
+<p>Se possível, pedimos que providencie a devolução o quanto antes, para que outros também possam utilizar.</p>
+<p style="color:#555; font-size:13px; margin-top:20px;">
+<strong>📌 Se já devolveu a chave recentemente, por favor desconsidere este aviso — o sistema ainda não registrou a devolução.</strong>
+</p>
+<p style="color:#777; font-size:12px; margin-top:10px;">
+⚠️ Este é um e-mail automático do sistema, por favor <strong>não responda</strong> a esta mensagem.
+</p>
+<p style="margin-top: 30px;">Agradecemos a sua colaboração! 😊</p>
+<p>Atenciosamente,<br>
+Equipe de Controle de Chaves<br>
+IFRS — Campus Alvorada</p>
+</body></html>"""
+
+    resultado = enviar_email(email, ass, corpo)
+    if isinstance(resultado, bool):
+        ok = resultado
+        mensagem = "E-mail enviado com sucesso" if ok else "Falha desconhecida"
+    else:
+        ok, mensagem = resultado
+
+    if ok:
+        cur.execute("""
+            UPDATE movimentacoes
+            SET alerta_enviado = TRUE, alerta_enviado_em = NOW(), alerta_erro = NULL
+            WHERE id = %s
+        """, (mid,))
+        log_acao("verificar_pendencias", "sistema", chave, "sucesso", f"E-mail enviado para {email}")
+        return True
+    else:
+        cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s", (mensagem, mid))
+        log_acao("verificar_pendencias", "sistema", chave, "erro", f"Falha: {mensagem}")
+        return False
+
+class TelaEnvioManualEmails(QDialog):
+    def __init__(self, lista_pendencias, parent=None):
+        super().__init__(parent)
+        self.lista_pendencias = lista_pendencias
+        self.selecionados = []
+        self.setWindowTitle("Envio Manual de Avisos de Atraso")
+        self.resize(900, 500)
+        self._construir_interface()
+
+    def _construir_interface(self):
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "📋 Selecione abaixo os avisos que deseja enviar por e-mail.\n"
+            "Avisos já enviados anteriormente não serão reenviados."
+        ))
+        self.tabela = QTableWidget()
+        self.tabela.setColumnCount(6)
+        self.tabela.setHorizontalHeaderLabels(["", "Chave", "Responsável", "E-mail", "Horas Atraso", "Status"])
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabela.setRowCount(len(self.lista_pendencias))
+
+        for linha, item in enumerate(self.lista_pendencias):
+            chk = QCheckBox()
+            chk.setEnabled(not item["ja_enviado"])
+            if not item["ja_enviado"]:
+                chk.stateChanged.connect(lambda est, mid=item["id"]: self._marcar(mid, est))
+            self.tabela.setCellWidget(linha, 0, chk)
+            self.tabela.setItem(linha, 1, QTableWidgetItem(item["chave"]))
+            self.tabela.setItem(linha, 2, QTableWidgetItem(item["usuario"]))
+            self.tabela.setItem(linha, 3, QTableWidgetItem(item["email"]))
+            self.tabela.setItem(linha, 4, QTableWidgetItem(f"{item['horas_atraso']}h"))
+            status = "✅ Já enviado" if item["ja_enviado"] else "⏳ Pendente"
+            self.tabela.setItem(linha, 5, QTableWidgetItem(status))
+        layout.addWidget(self.tabela)
+
+        botoes = QHBoxLayout()
+        self.btn_todos = QPushButton("Selecionar Todos Pendentes")
+        self.btn_todos.clicked.connect(self._selecionar_todos)
+        self.btn_enviar = QPushButton("📧 Enviar Avisos Selecionados")
+        self.btn_enviar.setStyleSheet("background-color: #28a745; color: white; padding: 6px;")
+        self.btn_enviar.clicked.connect(self._enviar_selecionados)
+        self.btn_cancelar = QPushButton("Cancelar")
+        self.btn_cancelar.clicked.connect(self.reject)
+        botoes.addWidget(self.btn_todos)
+        botoes.addStretch()
+        botoes.addWidget(self.btn_cancelar)
+        botoes.addWidget(self.btn_enviar)
+        layout.addLayout(botoes)
+
+    def _marcar(self, mid, estado):
+        if estado == 2:
+            if mid not in self.selecionados:
+                self.selecionados.append(mid)
+        else:
+            if mid in self.selecionados:
+                self.selecionados.remove(mid)
+
+    def _selecionar_todos(self):
+        for linha in range(self.tabela.rowCount()):
+            chk = self.tabela.cellWidget(linha, 0)
+            if chk and chk.isEnabled():
+                chk.setChecked(True)
+
+    def _enviar_selecionados(self):
+        if not self.selecionados:
+            QMessageBox.information(self, "Aviso", "Selecione pelo menos um aviso para enviar.")
+            return
+        total, enviados, _ = verificar_pendencias_e_enviar_emails(
+            modo_manual=True, lista_selecionada=self.selecionados
+        )
+        QMessageBox.information(self, "Concluído",
+            f"✅ Processo finalizado!\n\n"
+            f"Pendências encontradas: {total}\n"
+            f"Avisos enviados agora: {enviados}"
+        )
+        self.accept()
 
 class FiltroMovimentacaoDialog(QDialog):
     def __init__(self, parent=None):
@@ -352,6 +653,7 @@ class MovimentacoesTab(QWidget):
         self.sala_id_atual=None; self.filtro_atual=None; self.chave_fisica_id_atual=None
         self._em_operacao=False; self.filtro_apenas_copias=False
         self.utilizador_atual=get_current_user(); self.eh_admin=bool(self.utilizador_atual and self.utilizador_atual.get("is_admin"))
+        self.label_atraso = None
         self.init_ui()
         try: self.carregar_movimentacoes()
         except Exception as e: QMessageBox.critical(self,"Erro",f"Falha ao carregar:\n{e}")
@@ -376,9 +678,51 @@ class MovimentacoesTab(QWidget):
             if self.table.item(r,0) and self.table.item(r,0).text().strip()==str(mid):
                 self.table.selectRow(r); break
 
+    def _atualizar_contagem_pendencias(self):
+        qtd = ha_chaves_em_atraso()
+        if qtd > 0 and self.label_atraso:
+            self.label_atraso.setText(f"⚠️ {qtd} chave(s) em ATRASO!")
+            self.label_atraso.setVisible(True)
+        elif self.label_atraso:
+            self.label_atraso.setVisible(False)
+
     def acao_verificar_pendencias(self):
-        qtd=verificar_pendencias_e_enviar_emails()
-        QMessageBox.information(self,"Pendências",f"{qtd} pendência(s) em atraso." if qtd else "Nenhuma pendência em atraso.")
+        """Verifica pendências e ABRE a janela de envio quando em Modo Manual"""
+        modo_atual = carregar_modo_email()
+
+        if modo_atual == "automatico":
+            verificar_pendencias_e_enviar_emails()
+            QMessageBox.information(self, "✅ Verificação Concluída",
+                                    "Verificação concluída.\nOs e-mails foram enviados automaticamente.")
+        else:
+            # ✅ Agora CHAMA a função corretamente!
+            self.abrir_janela_envio_manual()
+
+    # ✅ === COLE A FUNÇÃO AQUI ===
+    def abrir_janela_envio_manual(self):
+        """Abre janela com lista de pendências para envio manual"""
+        total, enviados, lista_pendencias = verificar_pendencias_e_enviar_emails(modo_manual=True)
+
+        if not lista_pendencias:
+            QMessageBox.information(self, "✅ Nenhuma Pendência",
+                                    "Não há chaves em atraso para notificar.")
+            return
+
+        dlg = TelaEnvioManualEmails(lista_pendencias, self)
+        dlg.exec()
+
+    # ✅ === FIM DA FUNÇÃO ===
+
+    def _ao_mudar_modo_envio(self):
+        """Salva e confirma alteração de modo de envio"""
+        if self.modo_auto.isChecked():
+            salvar_modo_email("automatico")
+            QMessageBox.information(self, "✅ Modo Alterado",
+                "🔔 Envio AUTOMÁTICO ativado.\nO sistema verificará pendências a cada 1 minuto.")
+        else:
+            salvar_modo_email("manual")
+            QMessageBox.information(self, "✅ Modo Alterado",
+                "✋ Envio MANUAL ativado.\nSó verificará quando clicar em 'Verificar Pendências'.")
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -386,61 +730,34 @@ class MovimentacoesTab(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.addWidget(QLabel("<h2>Movimentações de Chaves/Salas</h2>"))
 
+        # Rótulo de aviso de atraso
+        self.label_atraso = QLabel("")
+        self.label_atraso.setStyleSheet("color: red; font-weight: bold; font-size: 11pt;")
+        self.label_atraso.setVisible(False)
+        layout.addWidget(self.label_atraso)
+
         estilo_botao = """
-        QPushButton {
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            min-height: 22px;
-        }
+        QPushButton { padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }
         """
         estilo_laranja = """
-        QPushButton {
-            background-color: #ff9900;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            min-height: 22px;
-        }
+        QPushButton { background-color: #ff9900; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }
         QPushButton:hover { background-color: #e68a00; }
         """
         estilo_verde = """
-        QPushButton {
-            background-color: #28a745;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            min-height: 22px;
-        }
+        QPushButton { background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }
         QPushButton:hover { background-color: #218838; }
         """
         estilo_azul = """
-        QPushButton {
-            background-color: #007bff;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            min-height: 22px;
-        }
+        QPushButton { background-color: #007bff; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }
         QPushButton:hover { background-color: #0069d9; }
         """
         estilo_cinza = """
-        QPushButton {
-            background-color: #f8f9fa;
-            border: 1px solid #ccc;
-            padding: 6px 12px;
-            border-radius: 4px;
-            min-height: 22px;
-        }
+        QPushButton { background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; min-height: 22px; }
         QPushButton:hover { background-color: #e9ecef; }
         """
 
         linha1 = QHBoxLayout()
         linha1.setSpacing(10)
-
         self.label_sala_selecionada = QLineEdit()
         self.label_sala_selecionada.setReadOnly(True)
         self.label_sala_selecionada.setPlaceholderText("Nenhuma sala selecionada")
@@ -450,7 +767,6 @@ class MovimentacoesTab(QWidget):
 
         self.combo_utilizador = QComboBox()
         self.combo_utilizador.setMinimumWidth(220)
-
         self.btn_novo_utilizador = QPushButton("+ Utilizador")
         self.btn_novo_utilizador.setStyleSheet(estilo_laranja)
         self.btn_novo_utilizador.clicked.connect(self.cadastrar_utilizador_rapido)
@@ -465,7 +781,6 @@ class MovimentacoesTab(QWidget):
         self.btn_retirar = QPushButton("Registrar Retirada")
         self.btn_retirar.setStyleSheet(estilo_verde)
         self.btn_retirar.clicked.connect(self.adicionar_movimentacao)
-
         self.btn_devolver = QPushButton("Registrar Devolução")
         self.btn_devolver.setStyleSheet(estilo_azul)
         self.btn_devolver.clicked.connect(self.devolver_selecionada)
@@ -486,37 +801,48 @@ class MovimentacoesTab(QWidget):
         self.btn_filtrar = QPushButton("Filtrar")
         self.btn_filtrar.setStyleSheet(estilo_cinza)
         self.btn_filtrar.clicked.connect(self.abrir_filtro_modal)
-
         self.btn_verificar_pendencias = QPushButton("Verificar pendências")
         self.btn_verificar_pendencias.setStyleSheet(estilo_cinza)
         self.btn_verificar_pendencias.clicked.connect(self.acao_verificar_pendencias)
 
+        # ✅ SELETOR DE MODO DE ENVIO — logo ao lado dos botões
         linha2.addWidget(self.btn_filtrar)
         linha2.addWidget(self.btn_verificar_pendencias)
+
+        linha2.addWidget(QLabel("  <b>Modo de Envio:</b>"))
+        self.modo_auto = QRadioButton("🔔 Automático")
+        self.modo_manual = QRadioButton("✋ Manual")
+
+        modo_salvo = carregar_modo_email()
+        if modo_salvo == "automatico":
+            self.modo_auto.setChecked(True)
+        else:
+            self.modo_manual.setChecked(True)
+
+        self.modo_auto.toggled.connect(self._ao_mudar_modo_envio)
+
+        linha2.addWidget(self.modo_auto)
+        linha2.addWidget(self.modo_manual)
         linha2.addStretch()
+
         layout.addLayout(linha2)
 
         linha3 = QHBoxLayout()
         linha3.setSpacing(10)
-
         self.btn_exportar_csv = QPushButton("Exportar CSV")
         self.btn_exportar_csv.setStyleSheet(estilo_cinza)
         self.btn_exportar_csv.clicked.connect(self.exportar_csv)
-
         self.btn_exportar_pdf = QPushButton("Exportar PDF")
         self.btn_exportar_pdf.setStyleSheet(estilo_cinza)
         self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
-
         self.btn_gerar_etiquetas = QPushButton("🖨️ Gerar Etiquetas QR")
         self.btn_gerar_etiquetas.setStyleSheet(estilo_cinza)
         self.btn_gerar_etiquetas.clicked.connect(self.acao_gerar_etiquetas)
         self.btn_gerar_etiquetas.setVisible(False)
-
         self.btn_ler_qrcode = QPushButton("📷 Ler QR / Devolver")
         self.btn_ler_qrcode.setStyleSheet(estilo_cinza)
         self.btn_ler_qrcode.clicked.connect(self.abrir_leitura_qrcode)
         self.btn_ler_qrcode.setVisible(False)
-
         linha3.addWidget(self.btn_exportar_csv)
         linha3.addWidget(self.btn_exportar_pdf)
         linha3.addWidget(self.btn_gerar_etiquetas)
@@ -528,7 +854,6 @@ class MovimentacoesTab(QWidget):
                    "Retirada", "Devolução", "Status", "Tipo", "Motivo", "Aviso"]
         if not self.eh_admin:
             colunas.pop(9)
-
         self.table = QTableWidget()
         self.table.setColumnCount(len(colunas))
         self.table.setHorizontalHeaderLabels(colunas)
@@ -539,7 +864,6 @@ class MovimentacoesTab(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         layout.addWidget(self.table)
-
         self.load_utilizadores_combo()
 
     def abrir_dialogo_salas(self):
@@ -589,89 +913,6 @@ class MovimentacoesTab(QWidget):
         if dlg.exec(): self.carregar_movimentacoes(); self._notificar_operacao("✅ Devolução registrada via QR Code!")
 
     def acao_gerar_etiquetas(self):
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QRadioButton, QListWidget, QListWidgetItem, QAbstractItemView
-
-        class EscolhaEtiquetasDialog(QDialog):
-            def __init__(self, parent=None):
-                super().__init__(parent)
-                self.setWindowTitle("🖨️ Gerar Etiquetas QR")
-                self.setMinimumSize(520, 420)
-                self.escolha = None
-                self.chaves_selecionadas = []
-
-                layout = QVBoxLayout(self)
-
-                self.radio_todas = QRadioButton("📋 Gerar de TODAS as chaves cadastradas")
-                self.radio_todas.setChecked(True)
-                self.radio_lote = QRadioButton("✅ Selecionar VÁRIAS chaves (em lote)")
-                self.radio_individual = QRadioButton("📄 Apenas UMA chave (individual)")
-
-                layout.addWidget(self.radio_todas)
-                layout.addWidget(self.radio_lote)
-                layout.addWidget(self.radio_individual)
-
-                self.lista_chaves = QListWidget()
-                self.lista_chaves.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-                self.lista_chaves.setVisible(False)
-                layout.addWidget(self.lista_chaves)
-
-                self._carregar_chaves()
-
-                from PyQt6.QtWidgets import QPushButton
-                self.btn_confirmar = QPushButton("➡️ Continuar")
-                self.btn_cancelar = QPushButton("Cancelar")
-                layout.addWidget(self.btn_confirmar)
-                layout.addWidget(self.btn_cancelar)
-
-                self.radio_todas.toggled.connect(self._atualizar_visibilidade)
-                self.radio_lote.toggled.connect(self._atualizar_visibilidade)
-                self.radio_individual.toggled.connect(self._atualizar_visibilidade)
-                self.btn_confirmar.clicked.connect(self._confirmar)
-                self.btn_cancelar.clicked.connect(self.reject)
-
-                self._atualizar_visibilidade()
-
-            def _atualizar_visibilidade(self):
-                mostrar_lista = self.radio_lote.isChecked() or self.radio_individual.isChecked()
-                self.lista_chaves.setVisible(mostrar_lista)
-                if self.radio_individual.isChecked():
-                    self.lista_chaves.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-                else:
-                    self.lista_chaves.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-
-            def _carregar_chaves(self):
-                conn = get_db_connection()
-                try:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "SELECT cf.id, cf.etiqueta, s.nome, s.descricao, cf.tipo FROM chaves_fisicas cf LEFT JOIN salas s ON cf.sala_id = s.id WHERE cf.ativa = TRUE ORDER BY cf.etiqueta")
-                    for cid, et, sa_nome, sa_desc, tipo in cur.fetchall():
-                        sala_display = f"{sa_nome} - {sa_desc}" if sa_desc else (sa_nome or "Sem sala")
-                        item = QListWidgetItem(f"{et} | {sala_display} | {tipo.upper()}")
-                        item.setData(1000, {"id": cid, "etiqueta": et, "sala_nome": sala_display, "tipo": tipo})
-                        self.lista_chaves.addItem(item)
-                finally:
-                    conn.close()
-
-            def _confirmar(self):
-                if self.radio_todas.isChecked():
-                    self.escolha = "todas"
-                    self.chaves_selecionadas = None
-                elif self.radio_lote.isChecked():
-                    self.escolha = "lote"
-                    self.chaves_selecionadas = [item.data(1000) for item in self.lista_chaves.selectedItems()]
-                    if not self.chaves_selecionadas:
-                        QMessageBox.warning(self, "Atenção", "Selecione pelo menos uma chave na lista!")
-                        return
-                else:
-                    self.escolha = "individual"
-                    itens = self.lista_chaves.selectedItems()
-                    if not itens:
-                        QMessageBox.warning(self, "Atenção", "Selecione uma chave na lista!")
-                        return
-                    self.chaves_selecionadas = [itens[0].data(1000)]
-                self.accept()
-
         dlg = EscolhaEtiquetasDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -681,12 +922,19 @@ class MovimentacoesTab(QWidget):
             try:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT cf.id, cf.etiqueta, s.nome, s.descricao, cf.tipo FROM chaves_fisicas cf LEFT JOIN salas s ON cf.sala_id = s.id WHERE cf.ativa = TRUE ORDER BY cf.etiqueta")
+                    "SELECT cf.id, cf.etiqueta, s.nome, s.descricao, cf.tipo "
+                    "FROM chaves_fisicas cf LEFT JOIN salas s ON cf.sala_id = s.id "
+                    "WHERE cf.ativa = TRUE ORDER BY cf.etiqueta"
+                )
                 chaves = []
                 for cid, et, sa_nome, sa_desc, tipo in cur.fetchall():
-                    chaves.append({"id": cid, "etiqueta": et,
-                                   "sala_nome": f"{sa_nome} - {sa_desc}" if sa_desc else (sa_nome or "Sem sala"),
-                                   "tipo": tipo})
+                    sala_display = f"{sa_nome} - {sa_desc}" if sa_desc else (sa_nome or "Sem sala")
+                    chaves.append({
+                        "id": cid,
+                        "etiqueta": et,
+                        "sala_nome": sala_display,
+                        "tipo": tipo
+                    })
             finally:
                 conn.close()
         else:
@@ -696,122 +944,201 @@ class MovimentacoesTab(QWidget):
             QMessageBox.information(self, "Aviso", "Nenhuma chave selecionada.")
             return
 
-        cam, _ = QFileDialog.getSaveFileName(self, "Salvar Etiquetas QR", "", "PDF (*.pdf)")
-        if cam:
-            gerar_etiquetas_pdf(cam, chaves)
-            QMessageBox.information(self, "✅ Sucesso!",
-                                    f"Etiquetas salvas em:\n{cam}\n\nQuantidade: {len(chaves)} etiqueta(s)")
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Etiquetas QR", "", "PDF (*.pdf)")
+        if caminho:
+            gerar_etiquetas_pdf(caminho, chaves)
+            QMessageBox.information(
+                self, "✅ Sucesso!",
+                f"Etiquetas salvas em:\n{caminho}\n\nQuantidade: {len(chaves)} etiqueta(s)"
+            )
             self._notificar_operacao(f"Etiquetas QR geradas: {len(chaves)} chave(s)")
 
     def carregar_movimentacoes(self):
-        if self._em_operacao: return
+        if self._em_operacao:
+            return
         try:
-            mid_sel=self._preservar_mov_id_selecionado()
-            dados=listar_movimentacoes() if self.filtro_atual is None else buscar_movimentacoes_personalizado(**self.filtro_atual)
+            mid_salvo = self._preservar_mov_id_selecionado()
+            if self.filtro_atual is None:
+                dados = listar_movimentacoes()
+            else:
+                dados = buscar_movimentacoes_personalizado(**self.filtro_atual)
             if self.eh_admin and self.filtro_apenas_copias:
-                sc=salas_com_pelo_menos_uma_copia(); dados=[r for r in dados if r[12] in sc]
-            self.exibir_historico(dados); self._restaurar_selecao_por_mov_id(mid_sel)
-        except Exception as e: print(f"Erro carregar: {e}")
+                ids_salas_copia = salas_com_pelo_menos_uma_copia()
+                dados = [linha for linha in dados if linha[12] in ids_salas_copia]
+            self.exibir_historico(dados)
+            self._restaurar_selecao_por_mov_id(mid_salvo)
+            self._atualizar_contagem_pendencias()
+        except Exception as erro:
+            print(f"Erro ao carregar movimentações: {erro}")
 
-    def exibir_historico(self,hist):
-        self.table.setRowCount(0); agora=datetime.now()
-        for idx,linha in enumerate(hist):
-            linha=list(linha); aviso=linha.pop()
-            if not self.eh_admin: linha.pop(9)
-            self.table.insertRow(idx)
-            for c,v in enumerate(linha):
-                if c in (6,7): v=formatar_data_br(v)
-                txt=str(v) if v is not None else ""
-                it=QTableWidgetItem(txt); it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if c==8:
-                    st=_normalizar_status(v); ret=linha[6]
-                    aplicar_cor_status_item_generico(it,st,ret,linha[7],agora)
-                    if st=="indisponivel" and _esta_em_atraso(ret,agora):
-                        it.setBackground(QBrush(QColor("#ffcccc"))); it.setForeground(QBrush(QColor("#b71c1c")))
-                self.table.setItem(idx,c,it)
-            aviso_item=QTableWidgetItem("✅" if aviso else "❌"); aviso_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            aviso_item.setToolTip("Enviado" if aviso else "Não enviado")
-            self.table.setItem(idx,self.table.columnCount()-1,aviso_item)
+    def exibir_historico(self, historico):
+        self.table.setRowCount(0)
+        agora = datetime.now()
+        for indice, linha in enumerate(historico):
+            linha = list(linha)
+            aviso_enviado = linha.pop()
+            if not self.eh_admin:
+                linha.pop(9)
+            self.table.insertRow(indice)
+            for coluna, valor in enumerate(linha):
+                if coluna in (6, 7):
+                    texto = formatar_data_br(valor)
+                else:
+                    texto = str(valor) if valor is not None else ""
+                item_tabela = QTableWidgetItem(texto)
+                item_tabela.setFlags(item_tabela.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                if coluna == 8:
+                    status_normalizado = _normalizar_status(valor)
+                    data_retirada = linha[6]
+                    aplicar_cor_status_item_generico(item_tabela, status_normalizado, data_retirada, linha[7], agora)
+                    if status_normalizado == "indisponivel" and _esta_em_atraso(data_retirada, agora):
+                        item_tabela.setBackground(QBrush(QColor("#ffcccc")))
+                        item_tabela.setForeground(QBrush(QColor("#b71c1c")))
+                self.table.setItem(indice, coluna, item_tabela)
+            item_aviso = QTableWidgetItem("✅" if aviso_enviado else "❌")
+            item_aviso.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_aviso.setToolTip("Aviso enviado" if aviso_enviado else "Aviso não enviado")
+            self.table.setItem(indice, self.table.columnCount() - 1, item_aviso)
 
     def adicionar_movimentacao(self):
-        sid=self.sala_id_atual; du=self.combo_utilizador.currentData() or {}; uid=du.get("id"); email=(du.get("email") or "").strip().lower()
-        mot=self.combo_motivo.currentData(); op=(get_current_user() or {}).get("login","sistema")
-        if not sid or uid is None: QMessageBox.warning(self,"Atenção","Selecione sala e utilizador."); return
-        ok,msg=pode_solicitar_retirada(uid)
-        if not ok: QMessageBox.warning(self,"Bloqueado",msg); return
-        if email and not email_valido(email): QMessageBox.warning(self,"Erro","E-mail inválido."); return
-        chave_row=obter_chave_fisica_disponivel_por_sala(sid, apenas_principal=not self.filtro_apenas_copias)
-        if not chave_row: QMessageBox.warning(self,"Sem chave","Nenhuma chave disponível."); return
-        cfid=chave_row[0]; ok,msg=pode_retirar_chave_fisica(cfid)
-        if not ok: QMessageBox.warning(self,"Atenção",msg); return
-        self._em_operacao=True; self.timer.stop()
+        sala_id = self.sala_id_atual
+        dados_usuario = self.combo_utilizador.currentData() or {}
+        usuario_id = dados_usuario.get("id")
+        email_usuario = (dados_usuario.get("email") or "").strip().lower()
+        motivo = self.combo_motivo.currentData()
+        operador = (get_current_user() or {}).get("login", "sistema")
+
+        if not sala_id or usuario_id is None:
+            QMessageBox.warning(self, "Atenção", "Selecione a sala e o utilizador.")
+            return
+
+        ok, mensagem = pode_solicitar_retirada(usuario_id)
+        if not ok:
+            QMessageBox.warning(self, "Bloqueado", mensagem)
+            return
+
+        if email_usuario and not email_valido(email_usuario):
+            QMessageBox.warning(self, "Erro", "E-mail inválido.")
+            return
+
+        chave_fisica = obter_chave_fisica_disponivel_por_sala(
+            sala_id, apenas_principal=not self.filtro_apenas_copias
+        )
+        if not chave_fisica:
+            QMessageBox.warning(self, "Sem chave", "Nenhuma chave disponível para esta sala.")
+            return
+
+        chave_fisica_id = chave_fisica[0]
+        ok, mensagem = pode_retirar_chave_fisica(chave_fisica_id)
+        if not ok:
+            QMessageBox.warning(self, "Atenção", mensagem)
+            return
+
+        self._em_operacao = True
+        self.timer.stop()
         try:
-            chave=registrar_retirada(sid,cfid,uid,email,mot)
-            log_acao("retirada",op,chave,"sucesso",f"sala={sid} chave={cfid}")
-            self.sala_id_atual=None; self.chave_fisica_id_atual=None; self.label_sala_selecionada.clear()
-            self.combo_utilizador.setCurrentIndex(0); self.combo_motivo.setCurrentIndex(0)
-            self.carregar_movimentacoes(); self._notificar_operacao(f"Retirada: {chave}")
-        except Exception as e: QMessageBox.critical(self,"Erro",f"Falha: {e}"); log_acao("retirada",op,f"sala={sid}","erro",str(e))
-        finally: self._em_operacao=False; self.timer.start(5000)
+            chave_nome = registrar_retirada(sala_id, chave_fisica_id, usuario_id, email_usuario, motivo)
+            log_acao("retirada", operador, chave_nome, "sucesso",
+                     f"sala={sala_id} chave_fisica={chave_fisica_id}")
+            self.sala_id_atual = None
+            self.chave_fisica_id_atual = None
+            self.label_sala_selecionada.clear()
+            self.combo_utilizador.setCurrentIndex(0)
+            self.combo_motivo.setCurrentIndex(0)
+            self.carregar_movimentacoes()
+            self._notificar_operacao(f"✅ Retirada registrada: {chave_nome}")
+        except Exception as erro:
+            QMessageBox.critical(self, "Erro", f"Falha ao registrar retirada:\n{erro}")
+            log_acao("retirada", operador, f"sala={sala_id}", "erro", str(erro))
+        finally:
+            self._em_operacao = False
+            self.timer.start(5000)
 
     def devolver_selecionada(self):
-        sel=self.table.selectionModel().selectedRows(); op=(get_current_user() or {}).get("login","sistema")
-        if not sel: QMessageBox.warning(self,"Atenção","Selecione uma linha."); return
-        r=sel[0].row(); mid=self.table.item(r,0).text().strip(); chave=self.table.item(r,1).text().strip()
-        st=_normalizar_status(self.table.item(r,8).text())
-        if not mid.isdigit(): QMessageBox.warning(self,"Erro","ID inválido."); return
-        if st=="disponivel": QMessageBox.information(self,"OK","Já devolvida."); return
-        self._em_operacao=True; self.timer.stop()
-        try:
-            chave,cfid,sid=registrar_devolucao(int(mid))
-            log_acao("devolucao",op,chave,"sucesso",f"mid={mid} sala={sid}")
-            self.carregar_movimentacoes(); self._notificar_operacao(f"Devolvida: {chave}")
-        except Exception as e: QMessageBox.critical(self,"Erro",f"Falha: {e}"); log_acao("devolucao",op,chave,"erro",str(e))
-        finally: self._em_operacao=False; self.timer.start(5000)
+        linhas_selecionadas = self.table.selectionModel().selectedRows()
+        operador = (get_current_user() or {}).get("login", "sistema")
+        if not linhas_selecionadas:
+            QMessageBox.warning(self, "Atenção", "Selecione uma linha na tabela.")
+            return
 
-    def obter_dados_da_tabela(self):
-        return [[(self.table.item(r,c).text() if self.table.item(r,c) else "") for c in range(self.table.columnCount())] for r in range(self.table.rowCount())]
+        linha = linhas_selecionadas[0].row()
+        movimentacao_id = self.table.item(linha, 0).text().strip()
+        chave_nome = self.table.item(linha, 1).text().strip()
+        status = _normalizar_status(self.table.item(linha, 8).text())
+
+        if not movimentacao_id.isdigit():
+            QMessageBox.warning(self, "Erro", "ID da movimentação inválido.")
+            return
+        if status == "disponivel":
+            QMessageBox.information(self, "OK", "Esta chave já foi devolvida.")
+            return
+
+        self._em_operacao = True
+        self.timer.stop()
+        try:
+            chave_devolvida, chave_fisica_id, sala_id = registrar_devolucao(int(movimentacao_id))
+            log_acao("devolucao", operador, chave_devolvida, "sucesso",
+                     f"movimentacao={movimentacao_id} sala={sala_id}")
+            self.carregar_movimentacoes()
+            self._notificar_operacao(f"✅ Devolução registrada: {chave_devolvida}")
+        except Exception as erro:
+            QMessageBox.critical(self, "Erro", f"Falha ao registrar devolução:\n{erro}")
+            log_acao("devolucao", operador, chave_nome, "erro", str(erro))
+        finally:
+            self._em_operacao = False
+            self.timer.start(5000)
+
+    def obter_dados_tabela(self):
+        dados = []
+        for linha in range(self.table.rowCount()):
+            celulas = []
+            for coluna in range(self.table.columnCount()):
+                item = self.table.item(linha, coluna)
+                celulas.append(item.text() if item else "")
+            dados.append(celulas)
+        return dados
 
     def exportar_csv(self):
-        cam,_=QFileDialog.getSaveFileName(self,"Salvar CSV","","CSV (*.csv)")
-        if not cam: return
-        dados=self.obter_dados_da_tabela()
-        cab=[self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
-        with open(cam,"w",newline="",encoding="utf-8-sig") as f:
-            w=csv.writer(f,delimiter=";"); w.writerow(cab); w.writerows(dados)
-        self._notificar_operacao("CSV salvo!")
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar CSV", "", "Arquivo CSV (*.csv)")
+        if not caminho:
+            return
+        dados = self.obter_dados_tabela()
+        cabecalho = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+        import csv
+        with open(caminho, "w", newline="", encoding="utf-8-sig") as arquivo:
+            escritor = csv.writer(arquivo, delimiter=";")
+            escritor.writerow(cabecalho)
+            escritor.writerows(dados)
+        self._notificar_operacao("✅ Arquivo CSV salvo com sucesso!")
 
     def exportar_pdf(self):
-        cam, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "", "PDF (*.pdf)")
-        if not cam:
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Relatório PDF", "", "Documento PDF (*.pdf)")
+        if not caminho:
             return
-        dados = self.obter_dados_da_tabela()
-        cab = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
-
-        est = getSampleStyleSheet()["BodyText"]
-        est.fontSize = 8
-        est.leading = 10
-        est.fontName = "Helvetica"
-
-        linhas = [cab]
-        for l in dados:
-            linhas.append([Paragraph(str(c).replace("&", "&amp;") if c else "", est) for c in l])
-
-        doc = SimpleDocTemplate(cam, pagesize=landscape(A4),
-                                leftMargin=20, rightMargin=20,
-                                topMargin=20, bottomMargin=20)
-
-        larg = [28, 80, 55, 130, 100, 70, 85, 85, 70, 55, 85, 50] if self.eh_admin \
+        dados = self.obter_dados_tabela()
+        cabecalho = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+        estilo = getSampleStyleSheet()["BodyText"]
+        estilo.fontSize = 8
+        estilo.leading = 10
+        estilo.fontName = "Helvetica"
+        linhas = [cabecalho]
+        for linha in dados:
+            linhas.append(
+                [Paragraph(str(celula).replace("&", "&amp;") if celula else "", estilo) for celula in linha])
+        doc = SimpleDocTemplate(
+            caminho, pagesize=landscape(A4),
+            leftMargin=20, rightMargin=20, topMargin=20, bottomMargin=20
+        )
+        larguras_colunas = [28, 80, 55, 130, 100, 70, 85, 85, 70, 55, 85, 50] if self.eh_admin \
             else [28, 80, 55, 130, 100, 70, 85, 85, 70, 85, 50]
-
-        t = Table(linhas, repeatRows=1, colWidths=larg)
-        t.setStyle(TableStyle([
+        tabela = Table(linhas, repeatRows=1, colWidths=larguras_colunas)
+        tabela.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4285F4")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),  # ✅ Corrigido
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -819,148 +1146,10 @@ class MovimentacoesTab(QWidget):
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]))
-
+        estilo_titulo = getSampleStyleSheet()["Title"]
         doc.build([
-            Paragraph("Relatório de Movimentações", getSampleStyleSheet()["Title"]),
+            Paragraph("Relatório de Movimentações", estilo_titulo),
             Spacer(1, 12),
-            t
+            tabela
         ])
-
-        self._notificar_operacao("PDF salvo!")
-
-def ha_chaves_em_atraso():
-    """Retorna quantidade de chaves em atraso (sem devolução + tempo limite excedido)"""
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT m.id, m.data_retirada
-            FROM movimentacoes m
-            WHERE m.status = 'indisponivel'
-              AND m.data_retorno IS NULL
-            ORDER BY m.data_retirada ASC
-        """)
-        linhas = cur.fetchall()
-        agora = datetime.now()
-        limite_horas = 24  # ⏱️ Tempo limite padrão: 24 horas
-        contador_atraso = 0
-
-        for mov_id, dt_retirada in linhas:
-            dt = _parse_datetime(dt_retirada)
-            if not dt:
-                continue
-            horas_passadas = (agora - dt).total_seconds() / 3600
-            if horas_passadas >= limite_horas:
-                contador_atraso += 1
-
-        return contador_atraso
-
-    finally:
-        conn.close()
-
-
-def _atualizar_aviso_atraso(self):
-    """Atualiza o rótulo vermelho com a quantidade de chaves em atraso"""
-    qtd_atraso = ha_chaves_em_atraso()
-
-    if qtd_atraso > 0:
-        self.label_atraso.setText(f"⚠️ {qtd_atraso} chave(s) em ATRASO!")
-        self.label_atraso.setStyleSheet("color: red; font-weight: bold; font-size: 11pt;")
-        self.label_atraso.setVisible(True)
-    else:
-        self.label_atraso.setVisible(False)
-
-
-def verificar_pendencias_e_enviar_emails():
-    conn = get_db_connection()
-    total = 0
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT m.id, m.chave, m.usuario, u.email, m.data_retirada, m.alerta_enviado
-            FROM movimentacoes m
-            LEFT JOIN utilizadores u ON m.utilizador_id = u.id
-            WHERE m.status = 'indisponivel' AND m.data_retorno IS NULL
-        """)
-        linhas = cur.fetchall()
-        agora = datetime.now()
-
-        for mid, chave, usuario, email, dt_ret, aviso in linhas:
-            if not dt_ret:
-                continue
-            dt = _parse_datetime(dt_ret)
-            if not dt:
-                log_acao("verificar_pendencias", "sistema", chave, "erro", f"Data inválida mov={mid}")
-                continue
-
-            # Verifica se está em atraso (ex: limite de 24h)
-            if (agora - dt).total_seconds() / 3600 < ALERTA_HORAS:
-                continue
-
-            total += 1
-            if aviso:
-                continue  # Já enviou, pula
-
-            log_acao("verificar_pendencias", "sistema", chave, "info",
-                     f"Atraso detectado: usuario={usuario} email={email}")
-
-            if not email:
-                msg = "E-mail não cadastrado no utilizador"
-                cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s", (msg, mid))
-                conn.commit()
-                log_acao("verificar_pendencias", "sistema", chave, "aviso", msg)
-                continue
-
-            if not email_valido(email):
-                msg = f"E-mail inválido: {email}"
-                cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s", (msg, mid))
-                conn.commit()
-                log_acao("verificar_pendencias", "sistema", chave, "erro", msg)
-                continue
-            ass = f"📌 Lembrando: Devolução da Chave {chave}"
-            corpo = f"""<html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">
-            <h2 style="color:#2c5aa0;">Lembrando da Devolução</h2>
-            <p>Olá, <strong>{usuario}</strong>!</p>
-            <p>Passando para lembrar-lhe de que a chave <strong>{chave}</strong> ainda não foi devolvida. Ela foi retirada em <strong>{formatar_data_br(dt_ret)}</strong>.</p>
-            <p>Se possível, pedimos que providencie a devolução o quanto antes, para que outros também possam utilizar.</p>
-            <p style="color:#555; font-size:13px; margin-top:20px;">
-            <strong>📌 Se já devolveu a chave recentemente, por favor desconsidere este aviso — o sistema ainda não registrou a devolução.</strong>
-            </p>
-            <p style="color:#777; font-size:12px; margin-top:10px;">
-            ⚠️ Este é um e-mail automático do sistema, por favor <strong>não responda</strong> a esta mensagem.
-            </p>
-            <p style="margin-top: 30px;">Agradecemos a sua colaboração! 😊</p>
-            <p>Atenciosamente,<br>
-            Equipe de Controle de Chaves<br>
-            IFRS — Campus Alvorada</p>
-            </body></html>"""
-
-            # ✅ CORRIGIDO: Trata retorno de enviar_email()
-            resultado = enviar_email(email, ass, corpo)
-
-            # Se retorna apenas 1 valor (bool)
-            if isinstance(resultado, bool):
-                ok = resultado
-                msg = "E-mail enviado com sucesso" if ok else "Falha desconhecida ao enviar e-mail"
-            # Se retorna 2 valores (ok, mensagem)
-            else:
-                ok, msg = resultado
-
-            if ok:
-                cur.execute("""
-                    UPDATE movimentacoes
-                    SET alerta_enviado=TRUE, alerta_enviado_em=NOW(), alerta_erro=NULL
-                    WHERE id=%s
-                """, (mid,))
-                log_acao("verificar_pendencias", "sistema", chave, "sucesso",
-                         f"E-mail enviado para {email}")
-            else:
-                cur.execute("UPDATE movimentacoes SET alerta_erro = %s WHERE id=%s", (msg, mid))
-                log_acao("verificar_pendencias", "sistema", chave, "erro",
-                         f"Falha: {msg}")
-
-            conn.commit()
-
-    finally:
-        conn.close()
-    return total
+        self._notificar_operacao("✅ Arquivo PDF salvo com sucesso!")

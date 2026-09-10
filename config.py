@@ -33,3 +33,29 @@ SMTP_PORT = email_cfg["smtp_port"]
 EMAIL_REMETENTE = email_cfg["email_remetente"]
 SMTP_USUARIO = email_cfg["smtp_usuario"]
 SMTP_SENHA = email_cfg["smtp_senha"]
+
+## Modo de envio de avisos de atraso
+# True  = Automático → envia sozinho após o limite de horas
+# False = Manual     → abre tela para você escolher quais enviar
+EMAIL_ENVIO_AUTOMATICO = True
+
+# Caminho do arquivo de configuração (para salvar a escolha)
+import json
+from pathlib import Path
+ARQUIVO_CONFIG = Path(__file__).parent / "config_status.json"
+
+def carregar_modo_email():
+    """Carrega a preferência salva, ou usa padrão"""
+    if ARQUIVO_CONFIG.exists():
+        try:
+            with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                return dados.get("EMAIL_ENVIO_AUTOMATICO", True)
+        except:
+            return True
+    return True
+
+def salvar_modo_email(modo: bool):
+    """Salva a preferência no arquivo"""
+    with open(ARQUIVO_CONFIG, "w", encoding="utf-8") as f:
+        json.dump({"EMAIL_ENVIO_AUTOMATICO": modo}, f)

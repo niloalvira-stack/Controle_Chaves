@@ -3,7 +3,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 from utils.config_app import get_email_config
-from database_module import get_connection  # Importa a conexão igual no resto do sistema
+from database_module import get_connection
+
 
 def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: int = None) -> bool:
     """
@@ -26,7 +27,9 @@ def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: i
         mensagem["To"] = destinatario
         mensagem["Subject"] = assunto
         mensagem["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S -0300")
-        mensagem.attach(MIMEText(corpo, "plain", "utf-8"))
+
+        # ✅ === LINHA CORRIGIDA ===
+        mensagem.attach(MIMEText(corpo, "html", "utf-8"))
 
         if smtp_port == 465:
             servidor = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
@@ -47,7 +50,7 @@ def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: i
                 cur = conn.cursor()
                 cur.execute("""
                     UPDATE movimentacoes
-                    SET email_aviso_atraso_enviado = TRUE
+                    SET alerta_enviado = TRUE
                     WHERE id = %s
                 """, (movimentacao_id,))
                 conn.commit()

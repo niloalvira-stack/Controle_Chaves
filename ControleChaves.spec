@@ -47,12 +47,16 @@ a = Analysis(
         'pyzbar.pyzbar',
         'qrcode',
         'cv2',
+        'datetime',               # ✅ ESSENCIAL para as correções de data!
         'reportlab',
         'reportlab.lib',
         'reportlab.lib.styles',
         'reportlab.lib.pagesizes',
         'reportlab.platypus',
         'reportlab.pdfbase',
+        'email',                  # ✅ Garante suporte a e-mails
+        'email.mime.multipart',
+        'email.mime.text',
     ],
     hookspath=[],
     hooksconfig={},
@@ -80,7 +84,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=False,  # ✅ Sem janela de console (apenas interface gráfica)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

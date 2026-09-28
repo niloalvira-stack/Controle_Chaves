@@ -17,7 +17,7 @@ from email_validator import validate_email, EmailNotValidError
 from autenticacao import get_current_user, validar_login, is_admin
 from utils.utils_log import log_acao
 from utils.button_style import aplicar_estilo_botao_padrao
-from database_module import get_connection, execute_query
+from database_module import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ class UtilizadorDialog(QDialog):
         self.edit_email = QLineEdit()
 
         self.combo_vinculo = QComboBox()
+        # ✅ PRIMEIRA OPÇÃO = "Escolher..." — FORÇA O USUÁRIO A ESCOLHER
+        self.combo_vinculo.addItem("Escolher vínculo...")
         self.combo_vinculo.addItems([
             "Servidor(a)",
             "Aluno(a)",
@@ -45,7 +47,10 @@ class UtilizadorDialog(QDialog):
             "Monitor(a)",
             "Estagiário(a)",
             "Externo(a)",
+            "Externo",
         ])
+        # Garante que inicie na opção padrão
+        self.combo_vinculo.setCurrentIndex(0)
 
         self.combo_ativo = QComboBox()
         self.combo_ativo.addItems(["Sim", "Não"])
@@ -53,11 +58,11 @@ class UtilizadorDialog(QDialog):
         self.date_fim = QDateEdit()
         self.date_fim.setCalendarPopup(True)
         self.date_fim.setDisplayFormat("dd/MM/yyyy")
-        self.date_fim.setDate(QDate.currentDate())
+        self.date_fim.setEnabled(False)  # Inicia bloqueado
 
         layout.addRow("Nome:", self.edit_nome)
         layout.addRow("E-mail:", self.edit_email)
-        layout.addRow("Vínculo:", self.combo_vinculo)
+        layout.addRow("Vínculo *:", self.combo_vinculo)
         layout.addRow("Ativo:", self.combo_ativo)
         layout.addRow("Válido até:", self.date_fim)
 
@@ -77,8 +82,38 @@ class UtilizadorDialog(QDialog):
 
         layout.addRow(self.button_box)
 
+        self.combo_vinculo.currentTextChanged.connect(self._atualizar_data_por_vinculo)
+
+    def _atualizar_data_por_vinculo(self, vinculo):
+        """Define a data automaticamente — só se vínculo for válido"""
+        hoje = QDate.currentDate()
+
+        # Ignora a opção padrão
+        if vinculo == "Escolher vínculo...":
+            self.date_fim.clear()
+            self.date_fim.setEnabled(False)
+            return
+
+        if vinculo == "Servidor(a)":
+            self.date_fim.clear()
+            self.date_fim.setEnabled(False)
+        elif vinculo == "Aluno(a)":
+            self.date_fim.setDate(hoje.addDays(7))
+            self.date_fim.setEnabled(True)
+        elif vinculo in ("Bolsista", "Estagiário(a)", "Monitor(a)"):
+            self.date_fim.setDate(QDate(hoje.year(), 12, 31))
+            self.date_fim.setEnabled(True)
+        elif vinculo in ("Externo", "Externo(a)"):
+            self.date_fim.setDate(hoje.addDays(90))
+            self.date_fim.setEnabled(True)
+        else:
+            self.date_fim.setEnabled(True)
+
     def _carregar_dados(self):
         if not self.dados:
+            # Novo registro — inicia na opção "Escolher..."
+            self.combo_vinculo.setCurrentIndex(0)
+            self._atualizar_data_por_vinculo("Escolher vínculo...")
             return
 
         self.edit_nome.setText(self.dados.get("nome", ""))
@@ -88,6 +123,14 @@ class UtilizadorDialog(QDialog):
         idx = self.combo_vinculo.findText(vinculo)
         if idx >= 0:
             self.combo_vinculo.setCurrentIndex(idx)
+        else:
+            # Tenta encontrar vínculo similar (resolvendo acento)
+            vinculo_limpo = (vinculo or "").strip()
+            for i in range(1, self.combo_vinculo.count()):
+                texto_combo = self.combo_vinculo.itemText(i)
+                if "Estagi" in vinculo_limpo and "Estagi" in texto_combo:
+                    self.combo_vinculo.setCurrentIndex(i)
+                    break
 
         self.combo_ativo.setCurrentIndex(0 if self.dados.get("ativo", True) else 1)
 
@@ -107,17 +150,35 @@ class UtilizadorDialog(QDialog):
                 qd = QDate(data_fim.year, data_fim.month, data_fim.day)
             self.date_fim.setDate(qd)
         else:
-            self.date_fim.setDate(QDate.currentDate())
+            self._atualizar_data_por_vinculo(self.combo_vinculo.currentText())
 
     def get_dados(self):
         nome = self.edit_nome.text().strip()
         email = self.edit_email.text().strip()
         vinculo = self.combo_vinculo.currentText()
         ativo = self.combo_ativo.currentText() == "Sim"
-        data_fim = self.date_fim.date().toPyDate()
+        hoje = QDate.currentDate()
+
+        # ✅ VALIDAÇÃO FORÇADA — Não deixa salvar se não escolheu
+        if vinculo == "Escolher vínculo...":
+            QMessageBox.warning(self, "Seleção obrigatória",
+                                "Por favor, escolha um vínculo na lista.")
+            return None
+
+        if not vinculo or vinculo.strip() == "":
+            QMessageBox.warning(self, "Dados incompletos", "Selecione um vínculo.")
+            return None
 
         if vinculo == "Servidor(a)":
             data_fim = None
+        elif vinculo == "Aluno(a)":
+            data_fim = hoje.addDays(7).toPyDate()
+        elif vinculo in ("Bolsista", "Estagiário(a)", "Monitor(a)"):
+            data_fim = QDate(hoje.year(), 12, 31).toPyDate()
+        elif vinculo in ("Externo", "Externo(a)"):
+            data_fim = hoje.addDays(90).toPyDate()
+        else:
+            data_fim = self.date_fim.date().toPyDate() if self.date_fim.date().isValid() else None
 
         return {
             "nome": nome,
@@ -127,15 +188,20 @@ class UtilizadorDialog(QDialog):
             "data_fim_validade": data_fim,
         }
 
+    def accept(self):
+        """Valida antes de fechar o diálogo"""
+        dados = self.get_dados()
+        if dados is None:
+            return  # Não fecha se não escolheu vínculo
+        super().accept()
+
 
 class UtilizadoresTab(QWidget):
     def __init__(self, movimentacoes_tab=None, parent=None):
         super().__init__(parent)
-
         self.icon_ativo = QIcon("icons/ok.png")
         self.icon_inativo = QIcon("icons/x.png")
         self.movimentacoes_tab = movimentacoes_tab
-
         self._setup_ui()
         self.carregar_dados()
 
@@ -215,41 +281,24 @@ class UtilizadoresTab(QWidget):
 
     def _email_valido_completo(self, email: str):
         email = (email or "").strip()
-
         if not email:
             QMessageBox.warning(self, "Dados incompletos", "E-mail é obrigatório.")
             return False, ""
-
         try:
             info = validate_email(email, check_deliverability=False)
             email_norm = info.normalized
         except EmailNotValidError as e:
-            QMessageBox.warning(
-                self,
-                "Endereço de e-mail inválido",
-                f"Endereço de e-mail inválido: {str(e)}",
-            )
+            QMessageBox.warning(self, "Endereço de e-mail inválido", f"Endereço de e-mail inválido: {str(e)}")
             return False, email
-
         try:
             dominio = email_norm.split("@", 1)[1]
         except IndexError:
-            QMessageBox.warning(
-                self,
-                "Endereço de e-mail inválido",
-                "O e-mail informado não contém um domínio válido.",
-            )
+            QMessageBox.warning(self, "Endereço de e-mail inválido", "O e-mail informado não contém um domínio válido.")
             return False, email_norm
-
         partes = dominio.rsplit(".", 1)
         if len(partes) == 2 and len(partes[1]) < 2:
-            QMessageBox.warning(
-                self,
-                "Endereço de e-mail inválido",
-                "O domínio do e-mail deve ter um TLD com pelo menos 2 letras.",
-            )
+            QMessageBox.warning(self, "Endereço de e-mail inválido", "O domínio do e-mail deve ter um TLD com pelo menos 2 letras.")
             return False, email_norm
-
         return True, email_norm.lower()
 
     def _decode_if_bytes(self, valor):
@@ -262,38 +311,20 @@ class UtilizadoresTab(QWidget):
         try:
             conn = get_connection()
             if conn is None:
-                QMessageBox.critical(
-                    self,
-                    "Erro",
-                    "Não foi possível conectar ao banco de dados.",
-                )
+                QMessageBox.critical(self, "Erro", "Não foi possível conectar ao banco de dados.")
                 return
-
             with closing(conn), conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT id, nome, email, vinculo, ativo, data_fim_validade
-                    FROM utilizadores
-                    ORDER BY id
-                    """
-                )
+                cur.execute("SELECT id, nome, email, vinculo, ativo, data_fim_validade FROM utilizadores ORDER BY id")
                 rows = cur.fetchall()
-
             for row in rows:
                 self._adicionar_linha(row)
-
         except Exception as e:
             logger.error(f"Erro ao carregar utilizadores: {e}")
-            QMessageBox.critical(
-                self,
-                "Erro",
-                f"Erro ao carregar utilizadores: {e}",
-            )
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar utilizadores: {e}")
 
     def _adicionar_linha(self, row):
         row_idx = self.table.rowCount()
         self.table.insertRow(row_idx)
-
         if hasattr(row, "keys"):
             id_ = row.get("id")
             nome = row.get("nome", "")
@@ -303,7 +334,6 @@ class UtilizadoresTab(QWidget):
             data_fim = row.get("data_fim_validade")
         else:
             id_, nome, email, vinculo, ativo, data_fim = row
-
         nome = self._decode_if_bytes(nome)
         email = self._decode_if_bytes(email)
         vinculo = self._decode_if_bytes(vinculo)
@@ -328,12 +358,10 @@ class UtilizadoresTab(QWidget):
                 texto_data = str(data_fim)
         else:
             texto_data = ""
-
         data_item = QTableWidgetItem(texto_data)
         data_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         itens = [id_item, nome_item, email_item, vinculo_item, status_item, data_item]
-
         for col, item in enumerate(itens):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row_idx, col, item)
@@ -341,11 +369,7 @@ class UtilizadoresTab(QWidget):
     def _get_linha_selecionada(self):
         linhas = self.table.selectionModel().selectedRows()
         if not linhas:
-            QMessageBox.information(
-                self,
-                "Seleção necessária",
-                "Selecione um utilizador na tabela.",
-            )
+            QMessageBox.information(self, "Seleção necessária", "Selecione um utilizador na tabela.")
             return None
         return linhas[0].row()
 
@@ -355,10 +379,8 @@ class UtilizadoresTab(QWidget):
         if ativo_val is None:
             texto = (ativo_item.text() or "").strip().lower()
             ativo_val = texto in ("sim", "ativo", "true", "1")
-
         data_item = self.table.item(row_idx, 5)
         data_fim = data_item.text().strip() if data_item and data_item.text() else None
-
         return {
             "id": int(self.table.item(row_idx, 0).text()),
             "nome": self.table.item(row_idx, 1).text(),
@@ -372,51 +394,29 @@ class UtilizadoresTab(QWidget):
         dlg = UtilizadorDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dados = dlg.get_dados()
-
+            if not dados:
+                return
             ok_email, email_normalizado = self._email_valido_completo(dados["email"])
             if not ok_email:
                 return
             dados["email"] = email_normalizado
-
             if not dados["nome"]:
                 QMessageBox.warning(self, "Dados incompletos", "Nome é obrigatório.")
                 return
-
             try:
                 with closing(get_connection()) as conn, conn.cursor() as cur:
                     cur.execute(
-                        """
-                        INSERT INTO utilizadores (nome, email, vinculo, ativo, data_fim_validade)
-                        VALUES (%s, %s, %s, %s, %s)
-                        RETURNING id
-                        """,
-                        (
-                            dados["nome"],
-                            dados["email"] or None,
-                            dados["vinculo"] or None,
-                            dados["ativo"],
-                            dados["data_fim_validade"],
-                        ),
+                        "INSERT INTO utilizadores (nome, email, vinculo, ativo, data_fim_validade) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                        (dados["nome"], dados["email"] or None, dados["vinculo"] or None, dados["ativo"], dados["data_fim_validade"]),
                     )
-
                     ret = cur.fetchone()
                     novo_id = ret.get("id") if hasattr(ret, "keys") else ret[0]
                     conn.commit()
-
                 user = get_current_user()
                 user_login = user.get("login", "") if isinstance(user, dict) else str(user or "")
-
-                log_acao(
-                    "create_user",
-                    user=user_login,
-                    resource=f"utilizador:{novo_id}",
-                    status="success",
-                    details=f"Cadastrou utilizador ID {novo_id}",
-                )
-
+                log_acao("create_user", user=user_login, resource=f"utilizador:{novo_id}", status="success", details=f"Cadastrou utilizador ID {novo_id}")
                 self.carregar_dados()
                 self._atualizar_combo_movimentacoes()
-
             except Exception as e:
                 logger.error(f"Erro ao criar utilizador: {e}")
                 QMessageBox.critical(self, "Erro", f"Erro ao criar utilizador: {e}")
@@ -425,204 +425,105 @@ class UtilizadoresTab(QWidget):
         row_idx = self._get_linha_selecionada()
         if row_idx is None:
             return
-
         dados_orig = self._get_dados_linha(row_idx)
         dlg = UtilizadorDialog(self, dados=dados_orig)
-
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dados = dlg.get_dados()
-
+            if not dados:
+                return
             ok_email, email_normalizado = self._email_valido_completo(dados["email"])
             if not ok_email:
                 return
             dados["email"] = email_normalizado
-
             if not dados["nome"]:
                 QMessageBox.warning(self, "Dados incompletos", "Nome é obrigatório.")
                 return
-
             try:
                 with closing(get_connection()) as conn, conn.cursor() as cur:
                     cur.execute(
-                        """
-                        UPDATE utilizadores
-                        SET nome = %s,
-                            email = %s,
-                            vinculo = %s,
-                            ativo = %s,
-                            data_fim_validade = %s
-                        WHERE id = %s
-                        """,
-                        (
-                            dados["nome"],
-                            dados["email"] or None,
-                            dados["vinculo"] or None,
-                            dados["ativo"],
-                            dados["data_fim_validade"],
-                            dados_orig["id"],
-                        ),
+                        "UPDATE utilizadores SET nome = %s, email = %s, vinculo = %s, ativo = %s, data_fim_validade = %s WHERE id = %s",
+                        (dados["nome"], dados["email"] or None, dados["vinculo"] or None, dados["ativo"], dados["data_fim_validade"], dados_orig["id"]),
                     )
                     conn.commit()
-
                 user = get_current_user()
                 user_login = user.get("login", "") if isinstance(user, dict) else str(user or "")
-
-                log_acao(
-                    "update_user",
-                    user=user_login,
-                    resource=f"utilizador:{dados_orig['id']}",
-                    status="success",
-                    details=f"Editou utilizador ID {dados_orig['id']}",
-                )
-
+                log_acao("update_user", user=user_login, resource=f"utilizador:{dados_orig['id']}", status="success", details=f"Editou utilizador ID {dados_orig['id']}")
                 self.carregar_dados()
                 self._atualizar_combo_movimentacoes()
-
             except Exception as e:
                 logger.error(f"Erro ao editar utilizador: {e}")
                 QMessageBox.critical(self, "Erro", f"Erro ao editar utilizador: {e}")
 
     def excluir_utilizador(self):
         if not is_admin():
-            QMessageBox.warning(
-                self,
-                "Permissão negada",
-                "Apenas administradores podem excluir utilizadores.",
-            )
+            QMessageBox.warning(self, "Permissão negada", "Apenas administradores podem excluir utilizadores.")
             return
-
         row_idx = self._get_linha_selecionada()
         if row_idx is None:
             return
-
         dados = self._get_dados_linha(row_idx)
-
         user_dict = get_current_user() or {}
         login_atual = user_dict.get("login", "") if isinstance(user_dict, dict) else str(user_dict)
-
         ok = validar_login(login_atual)
         if not ok:
-            QMessageBox.warning(
-                self,
-                "Sessão inválida",
-                "Não foi possível validar o usuário atual. Faça login novamente.",
-            )
+            QMessageBox.warning(self, "Sessão inválida", "Não foi possível validar o usuário atual. Faça login novamente.")
             return
-
         resp = QMessageBox.question(
-            self,
-            "Confirmação",
-            (
-                f"Tem certeza que deseja excluir o utilizador '{dados['nome']}'?\n"
-                f"Esta ação não poderá ser desfeita."
-            ),
+            self, "Confirmação",
+            f"Tem certeza que deseja excluir o utilizador '{dados['nome']}'?\nEsta ação não poderá ser desfeita.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if resp != QMessageBox.StandardButton.Yes:
             return
-
         try:
             with closing(get_connection()) as conn, conn.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM utilizadores WHERE id = %s",
-                    (dados["id"],),
-                )
+                cur.execute("DELETE FROM utilizadores WHERE id = %s", (dados["id"],))
                 conn.commit()
-
-            log_acao(
-                "delete_user",
-                user=login_atual,
-                resource=f"utilizador:{dados['id']}",
-                status="success",
-                details=f"Excluiu utilizador ID {dados['id']} ({dados['nome']})",
-            )
-
+            log_acao("delete_user", user=login_atual, resource=f"utilizador:{dados['id']}", status="success", details=f"Excluiu utilizador ID {dados['id']} ({dados['nome']})")
             self.carregar_dados()
             self._atualizar_combo_movimentacoes()
-
         except Exception as e:
             logger.error(f"Erro ao excluir utilizador: {e}")
-            QMessageBox.warning(
-                self,
-                "Não permitido",
-                "Este utilizador pode possuir movimentações associadas.\n"
-                "Use apenas 'Ativar/Desativar'.",
-            )
+            QMessageBox.warning(self, "Não permitido", "Este utilizador pode possuir movimentações associadas.\nUse apenas 'Ativar/Desativar'.")
 
     def ativar_desativar_utilizador(self):
         row_idx = self._get_linha_selecionada()
         if row_idx is None:
             return
-
         dados = self._get_dados_linha(row_idx)
         novo_status = not dados["ativo"]
-
         try:
             with closing(get_connection()) as conn, conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE utilizadores SET ativo = %s WHERE id = %s",
-                    (novo_status, dados["id"]),
-                )
+                cur.execute("UPDATE utilizadores SET ativo = %s WHERE id = %s", (novo_status, dados["id"]))
                 conn.commit()
-
             user = get_current_user()
             user_login = user.get("login", "") if isinstance(user, dict) else str(user or "")
-
-            log_acao(
-                "toggle_user",
-                user=user_login,
-                resource=f"utilizador:{dados['id']}",
-                status="success",
-                details="Ativou utilizador" if novo_status else "Desativou utilizador",
-            )
-
+            log_acao("toggle_user", user=user_login, resource=f"utilizador:{dados['id']}", status="success", details="Ativou utilizador" if novo_status else "Desativou utilizador")
             self.carregar_dados()
             self._atualizar_combo_movimentacoes()
-
         except Exception as e:
             logger.error(f"Erro ao alterar status do utilizador: {e}")
-            QMessageBox.critical(
-                self,
-                "Erro",
-                f"Erro ao alterar status do utilizador: {e}",
-            )
+            QMessageBox.critical(self, "Erro", f"Erro ao alterar status do utilizador: {e}")
 
     def exportar_csv(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Salvar utilizadores como CSV",
-            "utilizadores.csv",
-            "CSV Files (*.csv)",
-        )
+        path, _ = QFileDialog.getSaveFileName(self, "Salvar utilizadores como CSV", "utilizadores.csv", "CSV Files (*.csv)")
         if not path:
             return
-
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter=";")
                 writer.writerow(["ID", "Nome", "E-mail", "Vínculo", "Ativo", "Válido até"])
-
                 for row in range(self.table.rowCount()):
                     row_data = []
                     for col in range(self.table.columnCount()):
                         item = self.table.item(row, col)
                         row_data.append(item.text() if item else "")
                     writer.writerow(row_data)
-
-            QMessageBox.information(
-                self,
-                "Exportação concluída",
-                "Utilizadores exportados com sucesso.",
-            )
-
+            QMessageBox.information(self, "Exportação concluída", "Utilizadores exportados com sucesso.")
         except Exception as e:
             logger.error(f"Erro no export CSV: {e}")
-            QMessageBox.critical(
-                self,
-                "Erro",
-                f"Erro ao exportar: {e}",
-            )
+            QMessageBox.critical(self, "Erro", f"Erro ao exportar: {e}")
 
     def _atualizar_combo_movimentacoes(self):
         if self.movimentacoes_tab:

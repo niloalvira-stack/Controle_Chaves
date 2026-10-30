@@ -1,6 +1,7 @@
 import os
 from utils.resources import resource_path
 from utils.config_app import get_email_config, get_app_config
+from autenticacao.helpers_autenticacao import get_db_connection
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -34,28 +35,43 @@ EMAIL_REMETENTE = email_cfg["email_remetente"]
 SMTP_USUARIO = email_cfg["smtp_usuario"]
 SMTP_SENHA = email_cfg["smtp_senha"]
 
-## Modo de envio de avisos de atraso
-# True  = Automático → envia sozinho após o limite de horas
-# False = Manual     → abre tela para você escolher quais enviar
+# ⚠️ EMAIL_ENVIO_AUTOMATICO NÃO É MAIS USADO — agora vem do banco!
+# Mantido aqui apenas para compatibilidade temporária
 EMAIL_ENVIO_AUTOMATICO = True
 
-# Caminho do arquivo de configuração (para salvar a escolha)
-import json
-from pathlib import Path
-ARQUIVO_CONFIG = Path(__file__).parent / "config_status.json"
 
 def carregar_modo_email():
-    """Carrega a preferência salva, ou usa padrão"""
-    if ARQUIVO_CONFIG.exists():
-        try:
-            with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as f:
-                dados = json.load(f)
-                return dados.get("EMAIL_ENVIO_AUTOMATICO", True)
-        except:
-            return True
-    return True
+    """Carrega do BANCO — único para TODOS os clientes"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("SELECT valor FROM configuracoes WHERE chave = 'modo_envio_email'")
+            linha = cur.fetchone()
+            cur.close()
+            conn.close()
+            if linha:
+                return linha[0]
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar modo de envio: {e}")
+    return "automatico"  # Valor padrão
 
-def salvar_modo_email(modo: bool):
-    """Salva a preferência no arquivo"""
-    with open(ARQUIVO_CONFIG, "w", encoding="utf-8") as f:
-        json.dump({"EMAIL_ENVIO_AUTOMATICO": modo}, f)
+
+def salvar_modo_email(modo):
+    """Salva no BANCO — reflete imediatamente para TODOS os clientes"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO configuracoes (chave, valor) VALUES (%s, %s)
+                ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor
+            """, ('modo_envio_email', modo))
+            conn.commit()
+            cur.close()
+            conn.close()
+        print(f"✅ Modo de envio alterado para: {modo}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar modo de envio: {e}")
+        return False

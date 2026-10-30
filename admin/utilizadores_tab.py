@@ -47,8 +47,7 @@ class UtilizadorDialog(QDialog):
             "Monitor(a)",
             "Estagiário(a)",
             "Externo(a)",
-            "Externo",
-        ])
+                    ])
         # Garante que inicie na opção padrão
         self.combo_vinculo.setCurrentIndex(0)
 
@@ -314,7 +313,7 @@ class UtilizadoresTab(QWidget):
                 QMessageBox.critical(self, "Erro", "Não foi possível conectar ao banco de dados.")
                 return
             with closing(conn), conn.cursor() as cur:
-                cur.execute("SELECT id, nome, email, vinculo, ativo, data_fim_validade FROM utilizadores ORDER BY id")
+                cur.execute("SELECT id, nome, email, vinculo, ativo, data_fim_validade FROM utilizadores ORDER BY LOWER(nome) ASC")
                 rows = cur.fetchall()
             for row in rows:
                 self._adicionar_linha(row)

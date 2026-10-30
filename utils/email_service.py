@@ -2,15 +2,22 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
-from utils.config_app import get_email_config
+from utils.config_app import get_email_config, get_email_modo_envio  # ✅ Adicionada a nova função
 from database_module import get_connection
 
 
 def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: int = None) -> bool:
     """
-    Envia e-mail e opcionalmente marca como enviado na movimentação.
-    Retorna True se enviado com sucesso, False em caso de erro.
+    Envia e-mail respeitando o modo de envio configurado.
+    Retorna True se enviado, False se modo Manual.
     """
+    # ✅ Verifica o modo atual
+    modo = get_email_modo_envio()
+
+    # Se for Manual, NÃO envia automaticamente
+    if modo == "Manual":
+        return False  # A tela vai saber que precisa exibir o botão manual
+
     cfg = get_email_config()
     smtp_server = cfg["smtp_server"]
     smtp_port = cfg["smtp_port"]
@@ -28,7 +35,6 @@ def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: i
         mensagem["Subject"] = assunto
         mensagem["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S -0300")
 
-        # ✅ === LINHA CORRIGIDA ===
         mensagem.attach(MIMEText(corpo, "html", "utf-8"))
 
         if smtp_port == 465:
@@ -43,7 +49,6 @@ def enviar_email(destinatario: str, assunto: str, corpo: str, movimentacao_id: i
         servidor.sendmail(remetente, destinatario, mensagem.as_string())
         servidor.quit()
 
-        # ✅ SE TIVER O ID, MARCA COMO ENVIADO NO BANCO
         if movimentacao_id is not None:
             conn = get_connection()
             try:

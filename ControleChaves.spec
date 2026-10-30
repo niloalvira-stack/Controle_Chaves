@@ -5,8 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[
-        ('C:\\Users\\nilo.alvira\\AppData\\Roaming\\Python\\Python313\\site-packages\\pyzbar\\libiconv.dll', 'pyzbar'),
-        ('C:\\Users\\nilo.alvira\\AppData\\Roaming\\Python\\Python313\\site-packages\\pyzbar\\libzbar-64.dll', 'pyzbar'),
+        # ✅ REMOVIDO: pyzbar — não estamos usando QR Code
     ],
     datas=[
         ('config.ini', '.'),
@@ -37,31 +36,29 @@ a = Analysis(
         'utils.email_service',
         'utils.config_app',
         'controle.movimentacoes',
-        'controle.qrcode_helper',
         'controle.email_envio',
         'admin.utilizadores_tab',
         'admin.admin',
         'admin.log_viewer_tab',
         'relatorios.relatorios_tab',
-        'pyzbar',
-        'pyzbar.pyzbar',
-        'qrcode',
-        'cv2',
-        'datetime',               # ✅ ESSENCIAL para as correções de data!
+        # ❌ REMOVIDO: pyzbar, qrcode, cv2 — não utilizados
+        'datetime',
         'reportlab',
         'reportlab.lib',
         'reportlab.lib.styles',
         'reportlab.lib.pagesizes',
         'reportlab.platypus',
         'reportlab.pdfbase',
-        'email',                  # ✅ Garante suporte a e-mails
+        'email',
         'email.mime.multipart',
         'email.mime.text',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'pyzbar', 'qrcode', 'cv2',  # ✅ Exclui para reduzir tamanho
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -84,7 +81,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # ✅ Sem janela de console (apenas interface gráfica)
+    console=False,  # ✅ Sem janela preta
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

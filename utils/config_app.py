@@ -90,7 +90,7 @@ def get_app_config():
 
     defaults = {
         "app_name": "Controle de Chaves",
-        "app_version": "1.1.8",
+        "app_version": "1.1.9",
         "app_developer": "Nilo Alvira",
         "app_company": "IFRS-Campus Alvorada / DTI",
     }
@@ -106,3 +106,25 @@ def get_app_config():
         "app_developer": app.get("app_developer", defaults["app_developer"]).strip(),
         "app_company": app.get("app_company", defaults["app_company"]).strip(),
     }
+
+def get_email_modo_envio():
+    """Retorna o modo de envio: 'Manual' ou 'Automático'"""
+    config = load_config()
+    if config.has_section("email") and config.has_option("email", "modo_envio"):
+        valor = config.get("email", "modo_envio").strip()
+        return valor if valor in ("Manual", "Automático") else "Manual"
+    return "Manual"
+
+
+def set_email_modo_envio(novo_modo: str):
+    """Salva o modo de envio no config.ini — só admin com senha"""
+    if novo_modo not in ("Manual", "Automático"):
+        raise ValueError("Modo inválido. Use 'Manual' ou 'Automático'.")
+
+    config = load_config()
+    if not config.has_section("email"):
+        config.add_section("email")
+    config.set("email", "modo_envio", novo_modo)
+
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        config.write(f)

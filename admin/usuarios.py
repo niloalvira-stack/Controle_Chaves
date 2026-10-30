@@ -180,7 +180,8 @@ class UsuariosTab(QWidget):
 
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT id, login, nome, is_admin, primeiro_login FROM usuarios ORDER BY nome, login")
+            # ✅ Ordenação garantida por Nome (ignorando maiúsculas/minúsculas)
+            cursor.execute("SELECT id, login, nome, is_admin, primeiro_login FROM usuarios ORDER BY LOWER(nome) ASC")
             rows = cursor.fetchall()
             self.table.setRowCount(len(rows))
 

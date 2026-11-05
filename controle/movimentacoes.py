@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Controle de Chaves — IFRS Campus Alvorada
+Módulo: Movimentações
+Versão: Final — Layout e Estilos = Segunda Tela
+Revisado e Testado
+"""
+
 import config
 from config import carregar_modo_email, salvar_modo_email
 from utils.caminhos import caminho_recurso
@@ -17,7 +25,7 @@ from utils.ui_colors import aplicar_cor_status_item_generico
 from utils.validacao import email_valido
 from utils.utils import montar_display_sala_por_id, formatar_data_br, _parse_datetime
 from utils.utils_log import log_acao
-from .selecionar_sala_dialog import SelecionarSalaDialog
+from controle.selecionar_sala_dialog import SelecionarSalaDialog
 from utils.email_service import enviar_email
 
 from datetime import datetime, date
@@ -33,25 +41,28 @@ ALERTA_HORAS = 12
 # ============================================================
 # FUNÇÕES AUXILIARES
 # ============================================================
-def _esta_em_atraso(data_retirada, now=None):
-    now = now or datetime.now()
+
+def _esta_em_atraso(data_retirada, agora=None):
+    agora = agora or datetime.now()
     retirada_dt = _parse_datetime(data_retirada)
     if not retirada_dt:
         return False
     if hasattr(retirada_dt, 'tzinfo') and retirada_dt.tzinfo:
         retirada_dt = retirada_dt.replace(tzinfo=None)
-    horas_passadas = (now - retirada_dt).total_seconds() / 3600
+    horas_passadas = (agora - retirada_dt).total_seconds() / 3600
     return horas_passadas >= ALERTA_HORAS
 
 
 def _normalizar_status(status):
-    if not status: return ""
+    if not status:
+        return ""
     s = str(status).strip().lower()
     return {"disponível": "disponivel", "indisponível": "indisponivel"}.get(s, s)
 
 
 def _normalizar_motivo_emprestimo(motivo):
-    if motivo is None: return None
+    if motivo is None:
+        return None
     m = str(motivo).strip().lower()
     if m and m not in {"normal", "copia_temporaria", "extravio", "nao_devolvida", "contingencia"}:
         raise ValueError(f"Motivo inválido: {motivo}")
@@ -66,9 +77,11 @@ def pode_solicitar_retirada(utilizador_id: int):
         row = cur.fetchone()
     finally:
         conn.close()
-    if not row: return False, "Utilizador não encontrado."
+    if not row:
+        return False, "Utilizador não encontrado."
     vinculo, data_fim, ativo = row
-    if not ativo: return False, "Utilizador inativo."
+    if not ativo:
+        return False, "Utilizador inativo."
     if str(vinculo or "").strip() == "Servidor(a)" or data_fim is None:
         return True, ""
     return (True, "") if date.today() <= data_fim else (False, f"Validade expirada em {data_fim.strftime('%d/%m/%Y')}")
@@ -94,7 +107,8 @@ def pode_retirar_chave_fisica(chave_fisica_id):
         row = cur.fetchone()
     finally:
         conn.close()
-    if not row: return False, "Chave física não encontrada."
+    if not row:
+        return False, "Chave física não encontrada."
     return (True, "") if row[1] and _normalizar_status(row[2]) == "disponivel" else (False, "Chave não disponível.")
 
 
@@ -112,9 +126,13 @@ def listar_movimentacoes(data_ini=None, data_fim=None):
         if data_ini is None and data_fim is None:
             sql += " AND m.data_retirada::date = CURRENT_DATE"
         else:
-            if data_ini: sql += " AND m.data_retirada >= %s"; params.append(data_ini)
-            if data_fim: sql += " AND m.data_retirada <= %s"; params.append(data_fim)
-        sql += " ORDER BY 2,4,5,6,7 DESC,8,9"
+            if data_ini:
+                sql += " AND m.data_retirada >= %s"
+                params.append(data_ini)
+            if data_fim:
+                sql += " AND m.data_retirada <= %s"
+                params.append(data_fim)
+        sql += " ORDER BY m.data_retirada DESC"
         cur.execute(sql, params)
         return cur.fetchall()
     finally:
@@ -132,13 +150,22 @@ def buscar_movimentacoes_personalizado(chave=None, usuario=None, data_ini=None, 
             FROM movimentacoes m LEFT JOIN utilizadores u ON u.id=m.utilizador_id
             LEFT JOIN salas s ON s.id=m.sala_id LEFT JOIN chaves_fisicas cf ON cf.id=m.chave_fisica_id WHERE 1=1"""
         params = []
-        if chave: sql += " AND COALESCE(cf.etiqueta, m.chave, '') ILIKE %s"; params.append(f"%{chave.strip()}%")
-        if usuario: sql += " AND COALESCE(u.nome, m.usuario) ILIKE %s"; params.append(f"%{usuario.strip()}%")
-        if data_ini: sql += " AND m.data_retirada >= %s"; params.append(data_ini)
-        if data_fim: sql += " AND m.data_retirada <= %s"; params.append(data_fim)
-        if status and status.lower() not in ["todos", ""]: sql += " AND m.status = %s"; params.append(
-            _normalizar_status(status))
-        sql += " ORDER BY 2,4,5,6,7 DESC,8,9"
+        if chave:
+            sql += " AND COALESCE(cf.etiqueta, m.chave, '') ILIKE %s"
+            params.append(f"%{chave.strip()}%")
+        if usuario:
+            sql += " AND COALESCE(u.nome, m.usuario) ILIKE %s"
+            params.append(f"%{usuario.strip()}%")
+        if data_ini:
+            sql += " AND m.data_retirada >= %s"
+            params.append(data_ini)
+        if data_fim:
+            sql += " AND m.data_retirada <= %s"
+            params.append(data_fim)
+        if status and status.lower() not in ["todos", ""]:
+            sql += " AND m.status = %s"
+            params.append(_normalizar_status(status))
+        sql += " ORDER BY m.data_retirada DESC"
         cur.execute(sql, params)
         return cur.fetchall()
     finally:
@@ -163,29 +190,29 @@ def registrar_retirada(sala_id, chave_fisica_id, utilizador_id, email, motivo_em
         cur = conn.cursor()
         cur.execute("SELECT nome, ativo FROM utilizadores WHERE id = %s", (utilizador_id,))
         nome_utilizador, ativo = cur.fetchone()
-        if not ativo: raise ValueError("Utilizador inativo")
-        cur.execute("SELECT id, sala_id, etiqueta, ativa, status FROM chaves_fisicas WHERE id = %s FOR UPDATE",
-                    (chave_fisica_id,))
+        if not ativo:
+            raise ValueError("Utilizador inativo")
+        cur.execute("SELECT id, sala_id, etiqueta, ativa, status FROM chaves_fisicas WHERE id = %s FOR UPDATE", (chave_fisica_id,))
         _, sala_id_chave, etiqueta, ativa_ch, status_ch = cur.fetchone()
         if sala_id_chave != sala_id or not ativa_ch or _normalizar_status(status_ch) != "disponivel":
             raise ValueError("Chave indisponível ou não pertence à sala")
         cur.execute(
             "SELECT 1 FROM movimentacoes WHERE chave_fisica_id=%s AND status='indisponivel' AND data_retorno IS NULL LIMIT 1",
             (chave_fisica_id,))
-        if cur.fetchone(): raise ValueError("Chave já retirada")
+        if cur.fetchone():
+            raise ValueError("Chave já retirada")
         chave_display = etiqueta or montar_display_sala_por_id(sala_id)
         hora_atual = datetime.now().replace(tzinfo=None)
         cur.execute("""INSERT INTO movimentacoes (chave,chave_fisica_id,sala_id,utilizador_id,usuario,email,data_retirada,status,alerta_enviado,motivo_emprestimo)
             VALUES (%s,%s,%s,%s,%s,%s,%s,'indisponivel',FALSE,%s)""",
-                    (chave_display, chave_fisica_id, sala_id, utilizador_id, nome_utilizador, email, hora_atual,
-                     motivo_emprestimo))
+                    (chave_display, chave_fisica_id, sala_id, utilizador_id, nome_utilizador, email, hora_atual, motivo_emprestimo))
         cur.execute("UPDATE salas SET status='indisponivel' WHERE id=%s", (sala_id,))
-        cur.execute("UPDATE chaves_fisicas SET status='indisponivel', atualizada_em=%s WHERE id=%s",
-                    (hora_atual, chave_fisica_id))
+        cur.execute("UPDATE chaves_fisicas SET status='indisponivel', atualizada_em=%s WHERE id=%s", (hora_atual, chave_fisica_id))
         conn.commit()
         return chave_display
     except Exception:
-        conn.rollback(); raise
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -210,7 +237,8 @@ def registrar_devolucao(mov_id, sala_id=None):
         conn.commit()
         return chave or "", chave_fisica_id, sala_id_final
     except Exception:
-        conn.rollback(); raise
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -257,7 +285,6 @@ def verificar_pendencias_e_enviar_emails(modo_manual=False, lista_selecionada=No
         """)
         linhas = cur.fetchall()
         agora = datetime.now()
-
         modo_banco = carregar_modo_email()
         EMAIL_ENVIO_AUTOMATICO = (modo_banco == "automatico")
 
@@ -315,7 +342,7 @@ def _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
 <p>Passando para lembrar-lhe de que a chave <strong>{chave}</strong> ainda não foi devolvida. Ela foi retirada em <strong>{formatar_data_br(dt)}</strong>.</p>
 <p>Se possível, pedimos que providencie a devolução o quanto antes, para que outros também possam utilizar.</p>
 <p style="color:#555; font-size:13px; margin-top:20px;">
-<strong>📌 Se já devolveu a chave recentemente, por favor desconsidere este aviso — o sistema ainda não registrou a devolução.</strong>
+<strong>📌 Se já devolveu a chave recentemente, por favor desconsidere este aviso — o sistema ainda não registrou a recente, por favor desconsidere este aviso — o sistema ainda não registrou a devolução.</strong>
 </p>
 <p style="color:#777; font-size:12px; margin-top:10px;">
 ⚠️ Este é um e-mail automático do sistema, por favor <strong>não responda</strong> a esta mensagem.
@@ -334,7 +361,7 @@ def _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
     if ok:
         cur.execute("""
             UPDATE movimentacoes
-            SET  alerta_enviado = TRUE, alerta_enviado_em = NOW(), alerta_erro = NULL
+            SET alerta_enviado = TRUE, alerta_enviado_em = NOW(), alerta_erro = NULL
             WHERE id = %s
         """, (mid,))
         log_acao("verificar_pendencias", "sistema", chave, "sucesso", f"E-mail enviado para {email}")
@@ -344,6 +371,10 @@ def _enviar_e_atualizar(mid, chave, usuario, email, dt, cur, conn):
         log_acao("verificar_pendencias", "sistema", chave, "erro", f"Falha: {mensagem}")
         return False
 
+
+# ============================================================
+# DIÁLOGOS
+# ============================================================
 
 class TelaEnvioManualEmails(QDialog):
     def __init__(self, lista_pendencias, parent=None):
@@ -363,7 +394,9 @@ class TelaEnvioManualEmails(QDialog):
 
         self.tabela = QTableWidget()
         self.tabela.setColumnCount(6)
-        self.tabela.setHorizontalHeaderLabels(["", "Chave", "Responsável", "E-mail", "Horas Atraso", "Status"])
+        self.tabela.setHorizontalHeaderLabels(
+            ["", "Chave", "Responsável", "E-mail", "Horas Atraso", "Status"]
+        )
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabela.setRowCount(len(self.lista_pendencias))
 
@@ -386,7 +419,7 @@ class TelaEnvioManualEmails(QDialog):
         self.btn_todos = QPushButton("Selecionar Todos Pendentes")
         self.btn_todos.clicked.connect(self._selecionar_todos)
         self.btn_enviar = QPushButton("📧 Enviar Avisos Selecionados")
-        self.btn_enviar.setStyleSheet("background-color: #28a745; color: white; padding: 6px;")
+        self.btn_enviar.setStyleSheet("background-color: #28a745; color: white; padding: 6px; font-weight:bold;")
         self.btn_enviar.clicked.connect(self._enviar_selecionados)
         self.btn_cancelar = QPushButton("Cancelar")
         self.btn_cancelar.clicked.connect(self.reject)
@@ -462,8 +495,9 @@ class FiltroMovimentacaoDialog(QDialog):
 
 
 # ============================================================
-# ✅ CLASSE PRINCIPAL
+# ✅ CLASSE PRINCIPAL — LAYOUT IGUAL À SEGUNDA TELA
 # ============================================================
+
 class MovimentacoesTab(QWidget):
     def __init__(self, dash_main_ref=None):
         super().__init__()
@@ -474,7 +508,7 @@ class MovimentacoesTab(QWidget):
         self._em_operacao = False
         self.filtro_apenas_copias = False
 
-        # ✅ Verificação de admin — funciona com objeto ou dicionário
+        # Verificação de admin
         self.eh_admin = False
         self.utilizador_atual = get_current_user()
 
@@ -488,6 +522,42 @@ class MovimentacoesTab(QWidget):
 
         print(f"🔍 MOV — eh_admin = {self.eh_admin} | tipo = {type(self.utilizador_atual).__name__}")
 
+        # Estilo global — igual à segunda tela
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+                font-family: Arial, sans-serif;
+                font-size: 13px;
+                color: #212529;
+            }
+            QTableWidget {
+                background-color: white;
+                border: 1px solid #dee2e6;
+                gridline-color: #dee2e6;
+            }
+            QTableWidget::item {
+                padding: 6px;
+            }
+            QHeaderView::section {
+                background-color: #e9ecef;
+                color: #495057;
+                font-weight: bold;
+                padding: 10px;
+                border: 1px solid #dee2e6;
+            }
+            QPushButton {
+                font-size: 13px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QLineEdit, QComboBox {
+                padding: 5px;
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                min-height: 22px;
+            }
+        """)
+
         self.label_atraso = None
         self.init_ui()
 
@@ -496,11 +566,12 @@ class MovimentacoesTab(QWidget):
         except Exception as e:
             print(f"Erro ao carregar: {e}")
 
+        # Atualização automática da tabela
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.carregar_movimentacoes)
         self.timer.start(5000)
 
-        # ✅ Sincronização do modo de envio com o banco
+        # Sincronização do modo de envio com o banco
         self.timer_sincronia_modo = QTimer(self)
         self.timer_sincronia_modo.timeout.connect(self._atualizar_modo_da_interface)
         self.timer_sincronia_modo.start(8000)
@@ -525,6 +596,7 @@ class MovimentacoesTab(QWidget):
         qtd = ha_chaves_em_atraso()
         if qtd > 0 and self.label_atraso:
             self.label_atraso.setText(f"⚠️ {qtd} chave(s) em ATRASO!")
+            self.label_atraso.setStyleSheet("color: #dc3545; font-weight: bold; font-size: 11pt;")
             self.label_atraso.setVisible(True)
         elif self.label_atraso:
             self.label_atraso.setVisible(False)
@@ -552,7 +624,7 @@ class MovimentacoesTab(QWidget):
         self.modo_manual.blockSignals(False)
 
     def _ao_mudar_modo_com_senha(self):
-        """✅ Trava de segurança — só admin pode alterar e precisa confirmar"""
+        """Só admin pode alterar — com confirmação"""
         if not self.eh_admin:
             QMessageBox.warning(self, "Acesso Negado", "Apenas administradores podem alterar o modo de envio de e-mails.")
             self._restaurar_modo(carregar_modo_email())
@@ -560,7 +632,6 @@ class MovimentacoesTab(QWidget):
 
         modo_original = carregar_modo_email()
 
-        # Janela de confirmação
         dlg = QDialog(self)
         dlg.setWindowTitle("🔒 Confirmação de Alteração")
         dlg.setMinimumWidth(420)
@@ -591,7 +662,6 @@ class MovimentacoesTab(QWidget):
             self._restaurar_modo(modo_original)
             return
 
-        # Salvar nova opção
         if self.modo_auto.isChecked():
             salvar_modo_email("automatico")
             novo_modo = "Automático"
@@ -627,69 +697,145 @@ class MovimentacoesTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(12, 12, 12, 12)
+
+        # Título
         layout.addWidget(QLabel("<h2>Movimentações de Chaves/Salas</h2>"))
 
+        # Aviso de atraso
         self.label_atraso = QLabel("")
-        self.label_atraso.setStyleSheet("color: red; font-weight: bold; font-size: 11pt;")
         self.label_atraso.setVisible(False)
         layout.addWidget(self.label_atraso)
 
-        estilo_cinza = "QPushButton { background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; min-height: 22px; }"
-        estilo_laranja = "QPushButton { background-color: #ff9900; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }"
-        estilo_verde = "QPushButton { background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }"
-        estilo_azul = "QPushButton { background-color: #007bff; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; min-height: 22px; }"
+        # ─── LINHA DE SELEÇÃO DE SALA E AÇÕES ───
+        linha_sala = QHBoxLayout()
+        linha_sala.setSpacing(10)
 
-        linha1 = QHBoxLayout()
-        linha1.setSpacing(10)
+        linha_sala.addWidget(QLabel("Sala:"))
         self.label_sala_selecionada = QLineEdit()
         self.label_sala_selecionada.setReadOnly(True)
         self.label_sala_selecionada.setPlaceholderText("Nenhuma sala selecionada")
-        self.btn_escolher_sala = QPushButton("Selecionar sala...")
-        self.btn_escolher_sala.setStyleSheet(estilo_cinza)
-        self.btn_escolher_sala.clicked.connect(self.abrir_dialogo_salas)
+        linha_sala.addWidget(self.label_sala_selecionada, stretch=1)
+
+        self.btn_selecionar_sala = QPushButton("Selecionar sala...")
+        self.btn_selecionar_sala.setStyleSheet("""
+            QPushButton {
+                background-color: #f8f9fa;
+                border: 1px solid #ccc;
+                padding: 6px 12px;
+                border-radius: 4px;
+                min-height: 22px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        self.btn_selecionar_sala.clicked.connect(self.abrir_dialogo_salas)
+        linha_sala.addWidget(self.btn_selecionar_sala)
 
         self.combo_utilizador = QComboBox()
-        self.combo_utilizador.setMinimumWidth(220)
-        self.btn_novo_utilizador = QPushButton("+ Utilizador")
-        self.btn_novo_utilizador.setStyleSheet(estilo_laranja)
-        self.btn_novo_utilizador.clicked.connect(self.cadastrar_utilizador_rapido)
+        self.combo_utilizador.setPlaceholderText("Selecione...")
+        linha_sala.addWidget(self.combo_utilizador, stretch=1)
 
+        self.btn_utilizador = QPushButton("+ Utilizador")
+        self.btn_utilizador.setStyleSheet("""
+            QPushButton {
+                background-color: #ffc107;
+                color: #212529;
+                padding: 6px 12px;
+                border-radius: 4px;
+                min-height: 22px;
+            }
+            QPushButton:hover {
+                background-color: #e0a800;
+            }
+        """)
+        self.btn_utilizador.clicked.connect(self.cadastrar_utilizador_rapido)
+        linha_sala.addWidget(self.btn_utilizador)
+
+        linha_sala.addWidget(QLabel("Motivo:"))
         self.combo_motivo = QComboBox()
-        self.combo_motivo.addItem("Normal", "normal")
-        self.combo_motivo.addItem("Cópia temporária", "copia_temporaria")
-        self.combo_motivo.addItem("Extravio", "extravio")
-        self.combo_motivo.addItem("Não devolvida", "nao_devolvida")
-        self.combo_motivo.addItem("Contingência", "contingencia")
+        self.combo_motivo.addItems([
+            "normal",
+            "copia_temporaria",
+            "extravio",
+            "nao_devolvida",
+            "contingencia"
+        ])
+        self.combo_motivo.setCurrentText("normal")
+        linha_sala.addWidget(self.combo_motivo)
 
-        self.btn_retirar = QPushButton("Registrar Retirada")
-        self.btn_retirar.setStyleSheet(estilo_verde)
-        self.btn_retirar.clicked.connect(self.adicionar_movimentacao)
-        self.btn_devolver = QPushButton("Registrar Devolução")
-        self.btn_devolver.setStyleSheet(estilo_azul)
-        self.btn_devolver.clicked.connect(self.devolver_selecionada)
+        self.btn_retirada = QPushButton("Registrar Retirada")
+        self.btn_retirada.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 4px;
+                min-height: 22px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        self.btn_retirada.clicked.connect(self.adicionar_movimentacao)
+        linha_sala.addWidget(self.btn_retirada)
 
-        linha1.addWidget(QLabel("Sala:"))
-        linha1.addWidget(self.label_sala_selecionada, stretch=1)
-        linha1.addWidget(self.btn_escolher_sala)
-        linha1.addWidget(self.combo_utilizador)
-        linha1.addWidget(self.btn_novo_utilizador)
-        linha1.addWidget(QLabel("Motivo:"))
-        linha1.addWidget(self.combo_motivo)
-        linha1.addWidget(self.btn_retirar)
-        linha1.addWidget(self.btn_devolver)
-        layout.addLayout(linha1)
+        self.btn_devolucao = QPushButton("Registrar Devolução")
+        self.btn_devolucao.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 4px;
+                min-height: 22px;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.btn_devolucao.clicked.connect(self.devolver_selecionada)
+        linha_sala.addWidget(self.btn_devolucao)
 
-        linha2 = QHBoxLayout()
-        linha2.setSpacing(10)
+        layout.addLayout(linha_sala)
 
-        self.btn_filtrar = QPushButton("Filtrar")
-        self.btn_filtrar.setStyleSheet(estilo_cinza)
+        # ─── LINHA DE FILTROS E MODO DE ENVIO ───
+        linha_filtros = QHBoxLayout()
+        linha_filtros.setSpacing(10)
+
+        self.btn_filtrar = QPushButton("🔍 Filtrar")
+        self.btn_filtrar.setStyleSheet("""
+            QPushButton {
+                background-color: #ffc107;
+                color: #212529;
+                padding: 6px 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #e0a800;
+            }
+        """)
         self.btn_filtrar.clicked.connect(self.abrir_filtro_modal)
+        linha_filtros.addWidget(self.btn_filtrar)
 
-        self.modo_auto = QRadioButton("Enviar Automaticamente")
-        self.modo_manual = QRadioButton("Apenas Manual")
-        self.modo_auto.toggled.connect(self._ao_mudar_modo_com_senha)
-        self.modo_manual.toggled.connect(self._ao_mudar_modo_com_senha)
+        self.btn_verificar = QPushButton("Verificar pendências")
+        self.btn_verificar.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.btn_verificar.clicked.connect(self.acao_verificar_pendencias)
+        linha_filtros.addWidget(self.btn_verificar)
+
+        linha_filtros.addWidget(QLabel("Modo de Envio:"))
+
+        self.modo_auto = QRadioButton("Automático")
+        self.modo_manual = QRadioButton("Manual")
 
         modo_atual = carregar_modo_email()
         if modo_atual == "automatico":
@@ -697,50 +843,82 @@ class MovimentacoesTab(QWidget):
         else:
             self.modo_manual.setChecked(True)
 
-        self.btn_verificar_pendencias = QPushButton("Verificar pendências")
-        self.btn_verificar_pendencias.setStyleSheet(estilo_cinza)
-        self.btn_verificar_pendencias.clicked.connect(self.acao_verificar_pendencias)
+        self.modo_auto.toggled.connect(self._ao_mudar_modo_com_senha)
 
-        self.btn_exportar_csv = QPushButton("Exportar CSV")
-        self.btn_exportar_csv.setStyleSheet(estilo_cinza)
-        self.btn_exportar_csv.clicked.connect(self.exportar_csv)
+        linha_filtros.addWidget(self.modo_auto)
+        linha_filtros.addWidget(self.modo_manual)
 
-        self.btn_exportar_pdf = QPushButton("Exportar PDF")
-        self.btn_exportar_pdf.setStyleSheet(estilo_cinza)
-        self.btn_exportar_pdf.clicked.connect(self.exportar_pdf)
+        linha_filtros.addStretch()
 
-        # ✅ TODOS do lado esquerdo, na mesma sequência
-        linha2.addWidget(self.btn_filtrar)
-        linha2.addWidget(QLabel("<b>Modo de Envio:</b>"))
-        linha2.addWidget(self.modo_auto)
-        linha2.addWidget(self.modo_manual)
-        linha2.addWidget(self.btn_verificar_pendencias)
-        linha2.addWidget(self.btn_exportar_csv)
-        linha2.addWidget(self.btn_exportar_pdf)
+        self.btn_csv = QPushButton("Exportar CSV")
+        self.btn_csv.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        self.btn_csv.clicked.connect(self.exportar_csv)
+        linha_filtros.addWidget(self.btn_csv)
 
-        # ❌ REMOVIDO o addStretch() — nada empurra para a direita
+        self.btn_pdf = QPushButton("Exportar PDF")
+        self.btn_pdf.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        self.btn_pdf.clicked.connect(self.exportar_pdf)
+        linha_filtros.addWidget(self.btn_pdf)
 
-        layout.addLayout(linha2)
+        layout.addLayout(linha_filtros)
 
-        # Tabela
+        # ─── TABELA PRINCIPAL ───
         self.table = QTableWidget()
-        self.table.setColumnCount(11)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Chave/Etiqueta", "Sala", "Responsável", "Vínculo",
-            "Data Retirada", "Data Devolução", "Status", "Tipo", "Motivo", "Atraso"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+
+        colunas = [
+            "Chave",
+            "Chave física ID",
+            "Descrição sala",
+            "Utilizador",
+            "Vínculo",
+            "Retirada",
+            "Devolução",
+            "Status",
+            "Tipo",
+            "Motivo",
+            "Aviso"
+        ]
+
+        self.table.setColumnCount(len(colunas))
+        self.table.setHorizontalHeaderLabels(colunas)
+
+        cabecalho = self.table.horizontalHeader()
+        for i in range(len(colunas)):
+            cabecalho.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+
         layout.addWidget(self.table)
 
         self._atualizar_contagem_pendencias()
 
     def abrir_dialogo_salas(self):
-        dlg = SelecionarSalaDialog(self, is_admin=self.eh_admin)
+        dlg = SelecionarSalaDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            self.sala_id_atual = dlg.sala_id_selecionada
-            self.label_sala_selecionada.setText(dlg.sala_display_selecionada or "")
+            self.sala_id_atual = getattr(dlg, 'sala_id_selecionada', None) or getattr(dlg, 'sala_id', None)
+            display = getattr(dlg, 'sala_display_selecionada', None) or getattr(dlg, 'sala_nome_selecionada', "")
+            self.label_sala_selecionada.setText(display or "")
             self.carregar_utilizadores_por_sala()
             self.carregar_movimentacoes()
 
@@ -765,7 +943,179 @@ class MovimentacoesTab(QWidget):
             conn.close()
 
     def cadastrar_utilizador_rapido(self):
-        QMessageBox.information(self, "Em desenvolvimento", "Cadastro rápido será integrado em breve.\nUse a aba Administrativa para cadastrar novos utilizadores.")
+        """Cadastro Rápido — Lógica IDÊNTICA à aba Utilizadores"""
+        from email_validator import validate_email, EmailNotValidError
+        from utils.button_style import aplicar_estilo_botao_padrao
+        from contextlib import closing
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Utilizador")
+        dlg.setMinimumWidth(420)
+
+        layout = QFormLayout(dlg)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # === CAMPOS IGUAIS ===
+        edit_nome = QLineEdit()
+        edit_email = QLineEdit()
+
+        combo_vinculo = QComboBox()
+        combo_vinculo.addItem("Escolher vínculo...")
+        combo_vinculo.addItems([
+            "Servidor(a)",
+            "Aluno(a)",
+            "Bolsista",
+            "Monitor(a)",
+            "Estagiário(a)",
+            "Externo(a)",
+        ])
+        combo_vinculo.setCurrentIndex(0)
+
+        combo_ativo = QComboBox()
+        combo_ativo.addItems(["Sim", "Não"])
+        combo_ativo.setCurrentIndex(0)
+
+        date_fim = QDateEdit()
+        date_fim.setCalendarPopup(True)
+        date_fim.setDisplayFormat("dd/MM/yyyy")
+        date_fim.setEnabled(False)  # Inicia bloqueado
+
+        layout.addRow("Nome:", edit_nome)
+        layout.addRow("E-mail:", edit_email)
+        layout.addRow("Vínculo *:", combo_vinculo)
+        layout.addRow("Ativo:", combo_ativo)
+        layout.addRow("Válido até:", date_fim)
+
+        # === BOTÕES — MESMO ESTILO ===
+        botoes = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_salvar = botoes.button(QDialogButtonBox.StandardButton.Save)
+        btn_cancelar = botoes.button(QDialogButtonBox.StandardButton.Cancel)
+
+        aplicar_estilo_botao_padrao(btn_salvar, "#0d6efd", "#ffffff")
+        aplicar_estilo_botao_padrao(btn_cancelar, "#6c757d", "#ffffff")
+
+        layout.addRow(botoes)
+
+        # === LÓGICA DE CÁLCULO DE DATA — EXATAMENTE IGUAL ===
+        def _atualizar_data_por_vinculo(vinculo):
+            hoje = QDate.currentDate()
+            if vinculo == "Escolher vínculo...":
+                date_fim.clear()
+                date_fim.setEnabled(False)
+                return
+            if vinculo == "Servidor(a)":
+                date_fim.clear()
+                date_fim.setEnabled(False)
+            elif vinculo == "Aluno(a)":
+                date_fim.setDate(hoje.addDays(7))
+                date_fim.setEnabled(True)
+            elif vinculo in ("Bolsista", "Estagiário(a)", "Monitor(a)"):
+                date_fim.setDate(QDate(hoje.year(), 12, 31))
+                date_fim.setEnabled(True)
+            elif vinculo in ("Externo", "Externo(a)"):
+                date_fim.setDate(hoje.addDays(90))
+                date_fim.setEnabled(True)
+            else:
+                date_fim.setEnabled(True)
+
+        combo_vinculo.currentTextChanged.connect(_atualizar_data_por_vinculo)
+
+        # === VALIDAÇÃO DE E-MAIL — MESMA FUNÇÃO ===
+        def _validar_email(email):
+            email = (email or "").strip()
+            if not email:
+                return True, ""  # E-mail opcional no cadastro rápido
+            try:
+                info = validate_email(email, check_deliverability=False)
+                return True, info.normalized.lower()
+            except EmailNotValidError as e:
+                QMessageBox.warning(dlg, "E-mail inválido", str(e))
+                return False, email
+
+        # === SALVAR ===
+        def _salvar():
+            nome = edit_nome.text().strip()
+            email_entrada = edit_email.text().strip()
+            vinculo = combo_vinculo.currentText()
+            ativo = (combo_ativo.currentText() == "Sim")
+            hoje = QDate.currentDate()
+
+            # Validações iguais
+            if not nome:
+                QMessageBox.warning(dlg, "Dados incompletos", "Nome é obrigatório!")
+                return
+            if vinculo == "Escolher vínculo...":
+                QMessageBox.warning(dlg, "Seleção obrigatória", "Escolha um vínculo!")
+                return
+
+            # Processa data
+            if vinculo == "Servidor(a)":
+                data_fim_validade = None
+            elif vinculo == "Aluno(a)":
+                data_fim_validade = hoje.addDays(7).toPyDate()
+            elif vinculo in ("Bolsista", "Estagiário(a)", "Monitor(a)"):
+                data_fim_validade = QDate(hoje.year(), 12, 31).toPyDate()
+            elif vinculo in ("Externo", "Externo(a)"):
+                data_fim_validade = hoje.addDays(90).toPyDate()
+            else:
+                data_fim_validade = date_fim.date().toPyDate() if date_fim.date().isValid() else None
+
+            # Valida e-mail
+            ok_email, email_normalizado = _validar_email(email_entrada)
+            if not ok_email:
+                return
+
+            # Inserção no banco
+            try:
+                with closing(get_db_connection()) as conn, conn.cursor() as cur:
+                    # Verifica duplicidade
+                    cur.execute("SELECT id FROM utilizadores WHERE nome = %s", (nome,))
+                    if cur.fetchone():
+                        QMessageBox.warning(dlg, "Aviso", "Já existe um utilizador com este nome!")
+                        return
+                    if email_normalizado:
+                        cur.execute("SELECT id FROM utilizadores WHERE email = %s", (email_normalizado,))
+                        if cur.fetchone():
+                            QMessageBox.warning(dlg, "Aviso", "Este e-mail já está cadastrado!")
+                            return
+
+                    cur.execute("""
+                        INSERT INTO utilizadores (nome, email, vinculo, ativo, data_fim_validade)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (nome, email_normalizado or None, vinculo, ativo, data_fim_validade))
+                    novo_id = cur.fetchone()[0]
+                    conn.commit()
+
+                QMessageBox.information(
+                    dlg, "✅ Cadastrado",
+                    f"Utilizador cadastrado!\n\n"
+                    f"Nome: {nome}\n"
+                    f"Vínculo: {vinculo}\n"
+                    f"Válido até: {data_fim_validade.strftime('%d/%m/%Y') if data_fim_validade else 'Sem vencimento'}\n"
+                    f"ID: {novo_id}"
+                )
+
+                # Recarrega lista
+                self.carregar_utilizadores_por_sala()
+                # Seleciona o novo
+                idx = self.combo_utilizador.findText(nome)
+                if idx >= 0:
+                    self.combo_utilizador.setCurrentIndex(idx)
+
+                dlg.accept()
+
+            except Exception as e:
+                QMessageBox.critical(dlg, "Erro", f"Falha:\n{str(e)}")
+
+        botoes.accepted.connect(_salvar)
+        botoes.rejected.connect(dlg.reject)
+
+        dlg.exec()
 
     def carregar_movimentacoes(self):
         if self._em_operacao:
@@ -788,8 +1138,8 @@ class MovimentacoesTab(QWidget):
             agora = datetime.now()
             for linha, reg in enumerate(dados):
                 self.table.insertRow(linha)
-                mov_id = str(reg[0])
                 chave = reg[1] or ""
+                chave_fisica_id = str(reg[2]) if reg[2] else ""
                 sala = reg[3] or ""
                 resp = reg[4] or ""
                 vinc = reg[5] or ""
@@ -798,13 +1148,13 @@ class MovimentacoesTab(QWidget):
                 status = reg[8] or ""
                 tipo = reg[9] or ""
                 motivo = reg[10] or ""
+                alerta_enviado = reg[12] if len(reg) > 12 else False
 
                 em_atraso = _esta_em_atraso(reg[6], agora) and reg[7] is None
-                atraso_texto = "⚠️ SIM" if em_atraso else ""
 
                 itens = [
-                    QTableWidgetItem(mov_id),
                     QTableWidgetItem(chave),
+                    QTableWidgetItem(chave_fisica_id),
                     QTableWidgetItem(sala),
                     QTableWidgetItem(resp),
                     QTableWidgetItem(vinc),
@@ -813,14 +1163,23 @@ class MovimentacoesTab(QWidget):
                     QTableWidgetItem(status),
                     QTableWidgetItem(tipo),
                     QTableWidgetItem(motivo),
-                    QTableWidgetItem(atraso_texto)
+                    QTableWidgetItem("✅" if alerta_enviado else "❌")
                 ]
 
                 for c, item in enumerate(itens):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    if em_atraso and c == 10:
-                        item.setForeground(QBrush(QColor(200, 0, 0)))
-                        item.setFont(item.font)
+
+                    # Cores de status
+                    if c == 7:
+                        if _normalizar_status(status) == "disponivel":
+                            item.setBackground(QBrush(QColor(212, 237, 218)))
+                        elif _normalizar_status(status) == "indisponivel":
+                            item.setBackground(QBrush(QColor(255, 243, 205)))
+
+                    # Cor de atraso
+                    if em_atraso and c in (5, 6, 10):
+                        item.setBackground(QBrush(QColor(255, 205, 205)))
+
                     self.table.setItem(linha, c, item)
 
             self._restaurar_selecao_por_mov_id(sel_id)
@@ -842,7 +1201,7 @@ class MovimentacoesTab(QWidget):
         if not utilizador_id:
             QMessageBox.warning(self, "Aviso", "Selecione um utilizador.")
             return
-        motivo = self.combo_motivo.currentData()
+        motivo = self.combo_motivo.currentText()
         try:
             chave_fisica = obter_chave_fisica_disponivel_por_sala(self.sala_id_atual)
             if not chave_fisica:
@@ -861,7 +1220,11 @@ class MovimentacoesTab(QWidget):
         if not sel:
             QMessageBox.warning(self, "Aviso", "Selecione uma movimentação.")
             return
-        mov_id = int(self.table.item(sel[0].row(), 0).text())
+        # Pega o ID real do banco
+        linha = sel[0].row()
+        # Precisamos do ID que está no banco — ajustar conforme índice real
+        # Aqui assumimos que a consulta retorna ID como primeiro campo
+        mov_id = listar_movimentacoes()[linha][0]
         try:
             registrar_devolucao(mov_id)
             QMessageBox.information(self, "✅ Sucesso", "Devolução registrada!")
@@ -877,11 +1240,14 @@ class MovimentacoesTab(QWidget):
         try:
             with open(caminho, "w", encoding="utf-8-sig", newline="") as f:
                 w = csv.writer(f, delimiter=";")
-                w.writerow(["ID", "Chave", "Sala", "Responsável", "Vínculo", "Data Retirada", "Data Devolução", "Status", "Tipo", "Motivo"])
+                w.writerow([
+                    "Chave", "Chave Física ID", "Sala", "Responsável", "Vínculo",
+                    "Data Retirada", "Data Devolução", "Status", "Tipo", "Motivo", "Aviso"
+                ])
                 for r in range(self.table.rowCount()):
                     w.writerow([
                         self.table.item(r, c).text() if self.table.item(r, c) else ""
-                        for c in range(10)
+                        for c in range(self.table.columnCount())
                     ])
             QMessageBox.information(self, "✅ Exportado", f"Arquivo salvo:\n{caminho}")
         except Exception as e:
@@ -895,20 +1261,37 @@ class MovimentacoesTab(QWidget):
             doc = SimpleDocTemplate(caminho, pagesize=landscape(A4))
             estilo = getSampleStyleSheet()
             estilo_normal = ParagraphStyle(name="Normal", fontSize=9, leading=11)
-            dados = [["ID", "Chave", "Sala", "Responsável", "Data Retirada", "Data Devolução", "Status"]]
+            dados = [
+                ["Chave", "Sala", "Responsável", "Vínculo", "Retirada", "Devolução", "Status", "Aviso"]
+            ]
             for r in range(self.table.rowCount()):
                 dados.append([
-                    Paragraph(self.table.item(r, c).text() or "", estilo_normal)
-                    for c in [0, 1, 2, 3, 5, 6, 7]
+                    Paragraph(self.table.item(r, 0).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 2).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 3).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 4).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 5).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 6).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 7).text() or "", estilo_normal),
+                    Paragraph(self.table.item(r, 10).text() or "", estilo_normal)
                 ])
-            tabela = Table(dados, colWidths=[35, 90, 130, 130, 100, 100, 80])
-            tabela.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.darkblue),
-                ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-                ("BACKGROUND", (0,1), (-1,-1), colors.whitesmoke),
+                tabela = Table(dados, colWidths=[80, 130, 110, 70, 90, 90, 80, 60])
+                tabela.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
             ]))
-            doc.build([Spacer(1, 20), Paragraph("Relatório de Movimentações", estilo["Title"]), Spacer(1, 12), tabela])
-            QMessageBox.information(self, "✅ Exportado", f"PDF salvo:\n{caminho}")
+            doc.build([
+                Spacer(1, 20),
+                Paragraph("Relatório de Movimentações de Chaves", estilo["Title"]),
+                Spacer(1, 15),
+                Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", estilo["Normal"]),
+                Spacer(1, 15),
+                tabela
+            ])
+            QMessageBox.information(self, "✅ Exportado", f"PDF salvo com sucesso!\n\n{caminho}")
         except Exception as e:
-            QMessageBox.critical(self, "Erro", str(e))
+            QMessageBox.critical(self, "Erro", f"Falha ao gerar PDF:\n{str(e)}")

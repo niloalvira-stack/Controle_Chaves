@@ -4,9 +4,7 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[
-        # ✅ REMOVIDO: pyzbar — não estamos usando QR Code
-    ],
+    binaries=[],
     datas=[
         ('config.ini', '.'),
         ('config.py', '.'),
@@ -41,7 +39,12 @@ a = Analysis(
         'admin.admin',
         'admin.log_viewer_tab',
         'relatorios.relatorios_tab',
-        # ❌ REMOVIDO: pyzbar, qrcode, cv2 — não utilizados
+        # Matplotlib + dependências
+        'numpy',
+        'matplotlib',
+        'matplotlib.backends',
+        'matplotlib.backends.backend_qtagg',
+        'matplotlib.figure',
         'datetime',
         'reportlab',
         'reportlab.lib',
@@ -52,12 +55,16 @@ a = Analysis(
         'email',
         'email.mime.multipart',
         'email.mime.text',
+        'email_validator',
+        'bcrypt',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'pyzbar', 'qrcode', 'cv2',  # ✅ Exclui para reduzir tamanho
+        'pyzbar', 'qrcode', 'cv2',  # ✅ Só isso excluímos
+        'tkinter',
+        # ❌ REMOVIDO: numpy, matplotlib — não excluir mais!
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -81,10 +88,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # ✅ Sem janela preta
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    # icon='assets/icon.ico'  # Descomente só se o arquivo existir!
 )
